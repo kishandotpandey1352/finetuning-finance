@@ -1,0 +1,11 @@
+__pycache__/
+.env
+.venv/
+data/raw/
+data/cleaned/
+data/instruction/
+models/
+outputs/
+mlruns/
+*.pt
+*.safetensors
