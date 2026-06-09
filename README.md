@@ -59,3 +59,8 @@ docker ps
 http://localhost:8000/health
 http://localhost:8000/docs
 
+## Day 3
+### Run cleaner through Docker:
+docker compose run --rm data-cleaner
+### Run API:
+docker compose up finance-ai-platform --build

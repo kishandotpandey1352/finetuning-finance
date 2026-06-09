@@ -2,10 +2,19 @@ services:
   finance-ai-platform:
     build: .
     container_name: finance-ai-platform
+    ports:
+      - "8000:8000"
     volumes:
       - .:/app
     env_file:
       - .env
-    ports:
-      - "8000:8000"
-    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+
+  data-cleaner:
+    build: .
+    container_name: finance-data-cleaner
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    command: python src/data/clean.py --dataset all
