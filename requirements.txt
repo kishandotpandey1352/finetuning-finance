@@ -44,3 +44,4 @@ xxhash==3.7.0
 yarl==1.24.2
 fastapi
 uvicorn[standard]
+python-dotenv

@@ -5,6 +5,14 @@ import os
 
 app = FastAPI(title=os.getenv("APP_NAME", "finance-ai-platform"))
 
+@app.get("/")
+def root():
+    return {
+        "message": "Finance AI Platform API",
+        "status": "running",
+    }
+
+
 @app.get("/health")
 def health():
     return {
