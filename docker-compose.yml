@@ -1,0 +1,8 @@
+services:
+  finance-ai-platform:
+    build: .
+    container_name: finance-ai-platform
+    volumes:
+      - .:/app
+    env_file:
+      - .env
