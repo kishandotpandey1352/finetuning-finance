@@ -53,5 +53,9 @@ pip install datasets pandas pyarrow
 pip freeze > requirements.txt
 
 ## to run locally
-docker compose build
+docker compose build --no-cache
 docker compose up
+docker ps
+http://localhost:8000/health
+http://localhost:8000/docs
+
