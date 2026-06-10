@@ -64,3 +64,13 @@ http://localhost:8000/docs
 docker compose run --rm data-cleaner
 ### Run API:
 docker compose up finance-ai-platform --build
+
+#### chunk : sample file created
+
+echo Revenue increased by 18 percent due to stronger demand in cloud services. The company also reported higher operating expenses. > data\cleaned\sample.txt
+
+docker exec -it finance-ai-platform python src/data/chunk.py --input data/cleaned/sample.txt --output data/cleaned/sample_chunks.jsonl
+
+#### see the chunked sample file as output
+
+docker exec -it finance-ai-platform cat data/cleaned/sample_chunks.jsonl
