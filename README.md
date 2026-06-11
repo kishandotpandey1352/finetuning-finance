@@ -74,3 +74,10 @@ docker exec -it finance-ai-platform python src/data/chunk.py --input data/cleane
 #### see the chunked sample file as output
 
 docker exec -it finance-ai-platform cat data/cleaned/sample_chunks.jsonl
+
+## day 5: Add instruction dataset preparation and architecture document
+-- create instructions
+docker exec -it finance-ai-platform python src/data/prepare_instruction_dataset.py --chunks data/cleaned/sample_chunks.jsonl --output data/instruction/sample_instruction_dataset.jsonl --task summarization
+
+-- chek result
+docker exec -it finance-ai-platform cat data/instruction/sample_instruction_dataset.jsonl
