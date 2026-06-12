@@ -81,3 +81,29 @@ docker exec -it finance-ai-platform python src/data/prepare_instruction_dataset.
 
 -- chek result
 docker exec -it finance-ai-platform cat data/instruction/sample_instruction_dataset.jsonl
+
+## 90 samples of gold dataset combined:
+docker exec -it finance-ai-platform python src/data/combine_gold_dataset.py --input-dir data/instruction/gold --output data/instruction/finance_gold_v1.jsonl --shuffle
+
+-- check combining
+docker exec -it finance-ai-platform python src/data/combine_gold_dataset.py --input-dir data/instruction/gold --output data/instruction/finance_gold_v1.jsonl --shuffle
+
+## model setup for training
+docker exec -it finance-ai-platform python -c 
+
+"from transformers import AutoTokenizer; 
+
+AutoTokenizer.from_pretrained('Qwen/Qwen2.5-3B-Instruct'); 
+
+print('Qwen2.5-3B tokenizer is available or downloaded successfully')"
+
+-- To check whether the model files are already cached locally inside Docker
+ 
+docker exec -it finance-ai-platform python -c "from huggingface_hub import scan_cache_dir; print(scan_cache_dir())"
+
+-- To specifically try loading the model config without loading full weights:
+
+docker exec -it finance-ai-platform python -c "from transformers import AutoConfig; cfg=AutoConfig.from_pretrained('Qwen/Qwen2.5-3B-Instruct'); print(cfg.model_type); print(cfg.num_hidden_layers)"
+
+###run the training setup file:
+docker exec -it finance-ai-platform python src/training/check_training_setup.py
