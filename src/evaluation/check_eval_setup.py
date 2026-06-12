@@ -4,47 +4,61 @@ from sklearn.metrics import f1_score
 
 
 def main():
-    print("Evaluation setup check")
-
-    rouge = evaluate.load("rouge")
+    print("=" * 80)
+    print("Day 6 Evaluation Setup Check")
+    print("=" * 80)
 
     predictions = [
-        "Revenue increased because of stronger cloud demand."
+        "Revenue increased because of stronger cloud demand.",
+        "The company faces supplier concentration risk.",
     ]
 
     references = [
-        "Revenue grew due to strong demand for cloud services."
+        "Revenue grew due to strong demand for cloud services.",
+        "The company is exposed to supplier concentration risk.",
     ]
+
+    print("\nLoading ROUGE metric")
+    rouge = evaluate.load("rouge")
 
     rouge_result = rouge.compute(
         predictions=predictions,
         references=references,
     )
 
-    print("ROUGE result:")
-    print(rouge_result)
+    print("\nROUGE result:")
+    for metric, value in rouge_result.items():
+        print(f"{metric}: {value:.4f}")
 
-    P, R, F1 = score(
+    print("\nRunning BERTScore")
+    precision, recall, f1 = score(
         predictions,
         references,
         lang="en",
         verbose=False,
     )
 
-    print("BERTScore result:")
-    print({
-        "precision": float(P.mean()),
-        "recall": float(R.mean()),
-        "f1": float(F1.mean()),
-    })
+    bertscore_result = {
+        "precision": float(precision.mean()),
+        "recall": float(recall.mean()),
+        "f1": float(f1.mean()),
+    }
 
-    labels_true = [1, 0, 1, 1]
-    labels_pred = [1, 0, 0, 1]
+    print("\nBERTScore result:")
+    for metric, value in bertscore_result.items():
+        print(f"{metric}: {value:.4f}")
 
-    print("F1 classification score:")
-    print(f1_score(labels_true, labels_pred))
+    print("\nRunning classification F1 example")
+    true_labels = [1, 0, 1, 1, 0]
+    predicted_labels = [1, 0, 0, 1, 0]
 
-    print("Evaluation environment check passed")
+    classification_f1 = f1_score(true_labels, predicted_labels)
+
+    print(f"F1 score: {classification_f1:.4f}")
+
+    print("\n" + "=" * 80)
+    print("Evaluation setup check passed")
+    print("=" * 80)
 
 
 if __name__ == "__main__":

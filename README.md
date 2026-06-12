@@ -105,5 +105,8 @@ docker exec -it finance-ai-platform python -c "from huggingface_hub import scan_
 
 docker exec -it finance-ai-platform python -c "from transformers import AutoConfig; cfg=AutoConfig.from_pretrained('Qwen/Qwen2.5-3B-Instruct'); print(cfg.model_type); print(cfg.num_hidden_layers)"
 
-###run the training setup file:
+### run the training setup file:
 docker exec -it finance-ai-platform python src/training/check_training_setup.py
+
+### run the evaluation set up 
+docker exec -it finance-ai-platform python src/evaluation/check_eval_setup.py
