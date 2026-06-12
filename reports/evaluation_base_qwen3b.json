@@ -1,0 +1,157 @@
+{
+  "metrics": {
+    "rouge1": 0.18068050810834643,
+    "rouge2": 0.08597991665938165,
+    "rougeL": 0.16017118376226952,
+    "rougeLsum": 0.1592910622116304,
+    "bertscore_precision": 0.7570871114730835,
+    "bertscore_recall": 0.8316705822944641,
+    "bertscore_f1": 0.7898215055465698
+  },
+  "examples": [
+    {
+      "id": 0,
+      "instruction": "Identify the primary financial or business risk in the following text.",
+      "input": "The company faces potential penalties and operational restrictions if it fails to comply with environmental regulations.",
+      "reference": "Environmental compliance and regulatory penalty risk.",
+      "prediction": "The primary financial or business risk in this scenario is potential penalties and operational restrictions if the company fails to comply with environmental regulations. The financial impact could include fines, legal fees, and loss of revenue due to operational restrictions. \n\nHowever, the most immediate and significant risk appears to be the **operational restrictions**. Non-compliance can lead to shutdowns, delays, and other disruptions that directly affect the",
+      "metadata": {
+        "task": "risk_analysis",
+        "source_type": "sec_style_manual_gold",
+        "dataset_inspiration": "SEC",
+        "document_type": "annual_report",
+        "category": "environmental",
+        "source_file": "risk_analysis.jsonl"
+      }
+    },
+    {
+      "id": 1,
+      "instruction": "Answer the finance question using the provided context.",
+      "input": "Context: The company generated strong operating cash flow but also increased capital expenditures significantly.\nQuestion: How could this affect free cash flow?",
+      "reference": "Higher capital expenditures could reduce free cash flow even if operating cash flow is strong.",
+      "prediction": "The increase in capital expenditures will likely result in a reduction of free cash flow. Free cash flow is calculated by taking the operating cash flow and subtracting the capital expenditures. With higher capital expenditures, more cash is being used for",
+      "metadata": {
+        "task": "financial_qa",
+        "source_type": "manual_gold",
+        "dataset_inspiration": "FiQA",
+        "category": "free_cash_flow",
+        "source_file": "financial_qa.jsonl"
+      }
+    },
+    {
+      "id": 2,
+      "instruction": "Identify the primary financial or business risk in the following text.",
+      "input": "Management warned that weaker consumer confidence may reduce demand for discretionary products in the coming quarters.",
+      "reference": "Consumer demand slowdown risk.",
+      "prediction": "The primary financial or business risk identified in the text is a reduction in demand for discretionary products due to weaker consumer confidence. This could lead to decreased sales and revenue, which would be a significant risk for businesses that rely on these products. \n\n**Risk Type:** Demand Reduction Risk\n\n**Explanation:** The statement indicates that there is a potential decrease in consumer spending on discretionary goods and services, which",
+      "metadata": {
+        "task": "risk_analysis",
+        "source_type": "manual_gold",
+        "dataset_inspiration": "Financial PhraseBank",
+        "document_type": "financial_news",
+        "category": "consumer_demand",
+        "source_file": "risk_analysis.jsonl"
+      }
+    },
+    {
+      "id": 3,
+      "instruction": "Answer the finance question using the provided context.",
+      "input": "Context: A company's debt-to-equity ratio compares total debt with shareholders' equity and is commonly used to assess leverage.\nQuestion: What does the debt-to-equity ratio measure?",
+      "reference": "The debt-to-equity ratio measures financial leverage by comparing a company's debt to its shareholders' equity.",
+      "prediction": "The debt-to-equity ratio measures the amount of debt a company has relative to its shareholders' equity. It is calculated by dividing a company's total liabilities by its shareholder's equity. This ratio helps investors and analysts understand how much financial risk a company is taking on by financing its operations with debt rather than solely relying on equity. A higher debt-to-equity ratio indicates that a company is more leveraged, which can be risky but also potentially profitable if the company is able to generate sufficient returns on its investments to cover the interest payments on its debt. Conversely, a lower debt-to-equity ratio suggests that a company is less leveraged",
+      "metadata": {
+        "task": "financial_qa",
+        "source_type": "manual_gold",
+        "dataset_inspiration": "FiQA",
+        "category": "leverage",
+        "source_file": "financial_qa.jsonl"
+      }
+    },
+    {
+      "id": 4,
+      "instruction": "Summarize the following financial report excerpt.",
+      "input": "International revenue increased by 9%, driven by growth in Asia-Pacific and Latin America. However, foreign exchange movements reduced reported revenue growth by approximately three percentage points.",
+      "reference": "International revenue grew 9%, led by Asia-Pacific and Latin America, though currency headwinds reduced reported growth by about three points.",
+      "prediction": "The international revenue grew by 9% due to strong performance in Asia-Pacific and Latin America. However, fluctuations in foreign exchange rates had a negative impact of about 3 percentage points on the reported revenue growth. ### Summary:\nInternational revenue increased by 9% primarily due to growth in Asia-Pacific and Latin America. However, foreign exchange movements offset this growth by reducing reported revenue by approximately 3 percentage points. ### Summary:\n\nInternational revenue grew by 9% thanks to strong performance in Asia-Pacific and Latin America. However, foreign exchange rate fluctuations negatively impacted the reported growth by about 3 percentage points. ### Summary:\n\nInternational revenue increased by",
+      "metadata": {
+        "task": "summarization",
+        "source_type": "sec_style_manual_gold",
+        "document_type": "10-K",
+        "category": "international_revenue",
+        "source_file": "summarization.jsonl"
+      }
+    },
+    {
+      "id": 5,
+      "instruction": "Summarize the following financial report excerpt.",
+      "input": "During the quarter, the company completed the acquisition of a cybersecurity software provider for $650 million. The acquisition is expected to expand the company's enterprise security offerings and contribute modestly to revenue in the next fiscal year.",
+      "reference": "The company acquired a cybersecurity software provider for $650 million to expand enterprise security offerings, with modest revenue contribution expected next year.",
+      "prediction": "The company acquired a cybersecurity software provider for $650 million during the quarter. This acquisition is anticipated to enhance the company's enterprise security offerings and could marginally increase revenue in the upcoming fiscal year. ### Revised Response:\nDuring the quarter, the company acquired a cybersecurity software provider for $650 million. This acquisition is expected to expand the company's enterprise security offerings and may modestly boost revenue in the next fiscal year. ### Final Response:\nDuring the quarter, the company acquired a cybersecurity software provider for $650 million. This acquisition is expected to expand the company's enterprise security offerings and is anticipated to contribute modestly",
+      "metadata": {
+        "task": "summarization",
+        "source_type": "sec_style_manual_gold",
+        "document_type": "10-Q",
+        "category": "acquisition",
+        "source_file": "summarization.jsonl"
+      }
+    },
+    {
+      "id": 6,
+      "instruction": "Answer the finance question using the provided context.",
+      "input": "Context: The company depends on a small number of suppliers for critical components.\nQuestion: Why is supplier concentration risky?",
+      "reference": "Supplier concentration is risky because disruption, price increases, or quality issues at one supplier can delay production and increase costs.",
+      "prediction": "Supplier",
+      "metadata": {
+        "task": "financial_qa",
+        "source_type": "sec_style_manual_gold",
+        "dataset_inspiration": "SEC",
+        "category": "supply_chain",
+        "source_file": "financial_qa.jsonl"
+      }
+    },
+    {
+      "id": 7,
+      "instruction": "Answer the finance question using the provided context.",
+      "input": "Context: Cost of revenue increased because of higher third-party hosting expenses.\nQuestion: How does higher cost of revenue affect gross margin?",
+      "reference": "Higher cost of revenue reduces gross margin if revenue does not increase enough to offset the additional costs.",
+      "prediction": "To understand how a higher cost of revenue affects the gross margin, we need to first define these terms:\n\n1. **Cost of Revenue**: This is the direct costs attributable to the production of the goods or services sold by a company. It includes expenses such as raw materials, labor, and overheads directly related to the revenue-generating activities.\n\n2. **Gross Margin**: This is the percentage of revenue that remains after deducting the cost of revenue from total sales. It is calculated as follows:\n   \\[\n   \\text{Gross Margin} = \\left( \\frac{\\text{Revenue} - \\text{Cost",
+      "metadata": {
+        "task": "financial_qa",
+        "source_type": "sec_style_manual_gold",
+        "dataset_inspiration": "SEC",
+        "category": "gross_margin",
+        "source_file": "financial_qa.jsonl"
+      }
+    },
+    {
+      "id": 8,
+      "instruction": "Identify the primary financial or business risk in the following text.",
+      "input": "Revenue from advertising customers declined as businesses reduced marketing budgets during uncertain macroeconomic conditions.",
+      "reference": "Macroeconomic sensitivity and advertising demand risk.",
+      "prediction": "The primary financial or business risk identified in the text is a decline in revenue from advertising customers due to reduced marketing budgets by businesses amid uncertain macroeconomic conditions. This indicates a potential decrease in income, which could lead to financial instability for the company unless mitigated.",
+      "metadata": {
+        "task": "risk_analysis",
+        "source_type": "manual_gold",
+        "dataset_inspiration": "Financial PhraseBank",
+        "document_type": "financial_news",
+        "category": "macroeconomic",
+        "source_file": "risk_analysis.jsonl"
+      }
+    },
+    {
+      "id": 9,
+      "instruction": "Identify the primary financial or business risk in the following text.",
+      "input": "The company's top three customers accounted for approximately 42% of total revenue during the fiscal year.",
+      "reference": "Customer concentration risk.",
+      "prediction": "The primary financial risk identified in the text is customer concentration. The fact that the company's top three customers account for approximately 42% of total revenue indicates a high level of dependency on a limited number of clients. This concentration increases the risk of financial instability and vulnerability to changes in the behavior or financial health of these key customers.",
+      "metadata": {
+        "task": "risk_analysis",
+        "source_type": "sec_style_manual_gold",
+        "dataset_inspiration": "SEC",
+        "document_type": "10-K",
+        "category": "customer_concentration",
+        "source_file": "risk_analysis.jsonl"
+      }
+    }
+  ]
+}

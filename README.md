@@ -111,5 +111,67 @@ docker exec -it finance-ai-platform python src/training/check_training_setup.py
 ### run the evaluation set up 
 docker exec -it finance-ai-platform python src/evaluation/check_eval_setup.py
 
-### run a smoke tets on training the Qwen 2.5-3B-instruct model
-docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_v1.jsonl --output-dir outputs/qlora-finance-smoke-test --max-steps 5 --max-length 256
+### run the local training on the Qwen 2.5-3B-instruct model
+docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_v1.jsonl --output-dir outputs/qlora-finance-v1 --max-steps 50 --max-length 512
+
+### After the first run on 90 datasets, following results obtained:
+Model: Qwen/Qwen2.5-3B-Instruct
+Dataset: 90 gold examples
+QLoRA: working
+GPU: RTX 5060 Laptop GPU
+Trainable params: 29.9M / 3.1B
+Trainable %: 0.96%
+Runtime: 121 seconds
+Final train loss: ~1.004
+Adapter saved: outputs/qlora-finance-v1
+
+### Evaluation of the first run
+--evaluation against this fine-tuned adapter:
+
+docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_v1.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-v1 --output-report reports/evaluation_finetuned_qwen3b.json --limit 10 --max-new-tokens 128
+
+Eg:
+Metrics:
+rouge1: 0.6265
+rouge2: 0.4084
+rougeL: 0.5627
+rougeLsum: 0.5611
+bertscore_precision: 0.9197
+bertscore_recall: 0.9305
+bertscore_f1: 0.9250
+Evaluation report saved to: reports/evaluation_finetuned_qwen3b.json
+
+--evaluate the base model for comparison:
+
+docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_v1.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --output-report reports/evaluation_base_qwen3b.json --limit 10 --max-new-tokens 128
+
+Eg:
+
+Metrics:
+rouge1: 0.1807
+rouge2: 0.0860
+rougeL: 0.1602
+rougeLsum: 0.1593
+bertscore_precision: 0.7571
+bertscore_recall: 0.8317
+bertscore_f1: 0.7898
+Evaluation report saved to: reports/evaluation_base_qwen3b.json
+================================================================================
+Evaluation complete
+=============================================
+
+\\\Initial QLoRA Experiment Results
+
+Base model: Qwen2.5-3B-Instruct
+Fine-tuning method: QLoRA
+Dataset: 90 manually curated finance instruction examples
+Training steps: 50
+Max sequence length: 512
+Trainable parameters: 29.9M / 3.1B, approximately 0.96%
+
+Results:
+- ROUGE-L improved from 0.1602 to 0.5627
+- BERTScore F1 improved from 0.7898 to 0.9250
+
+Interpretation:
+The fine-tuned adapter produced outputs that were substantially closer to the target finance summaries, risk labels, and QA answers. Because this was an initial small-data experiment, a held-out test set is required for stronger generalization claims.

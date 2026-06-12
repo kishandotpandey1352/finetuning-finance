@@ -1,0 +1,157 @@
+{
+  "metrics": {
+    "rouge1": 0.6264719825092165,
+    "rouge2": 0.4083622990146514,
+    "rougeL": 0.5627333068822431,
+    "rougeLsum": 0.5610744102233465,
+    "bertscore_precision": 0.9196727871894836,
+    "bertscore_recall": 0.9305180311203003,
+    "bertscore_f1": 0.9249700307846069
+  },
+  "examples": [
+    {
+      "id": 0,
+      "instruction": "Identify the primary financial or business risk in the following text.",
+      "input": "The company faces potential penalties and operational restrictions if it fails to comply with environmental regulations.",
+      "reference": "Environmental compliance and regulatory penalty risk.",
+      "prediction": "Environmental compliance and regulatory penalty risk.",
+      "metadata": {
+        "task": "risk_analysis",
+        "source_type": "sec_style_manual_gold",
+        "dataset_inspiration": "SEC",
+        "document_type": "annual_report",
+        "category": "environmental",
+        "source_file": "risk_analysis.jsonl"
+      }
+    },
+    {
+      "id": 1,
+      "instruction": "Answer the finance question using the provided context.",
+      "input": "Context: The company generated strong operating cash flow but also increased capital expenditures significantly.\nQuestion: How could this affect free cash flow?",
+      "reference": "Higher capital expenditures could reduce free cash flow even if operating cash flow is strong.",
+      "prediction": "Free cash flow may be reduced because capital expenditures are a significant use of cash.",
+      "metadata": {
+        "task": "financial_qa",
+        "source_type": "manual_gold",
+        "dataset_inspiration": "FiQA",
+        "category": "free_cash_flow",
+        "source_file": "financial_qa.jsonl"
+      }
+    },
+    {
+      "id": 2,
+      "instruction": "Identify the primary financial or business risk in the following text.",
+      "input": "Management warned that weaker consumer confidence may reduce demand for discretionary products in the coming quarters.",
+      "reference": "Consumer demand slowdown risk.",
+      "prediction": "Consumer demand and discretionary product demand risk.",
+      "metadata": {
+        "task": "risk_analysis",
+        "source_type": "manual_gold",
+        "dataset_inspiration": "Financial PhraseBank",
+        "document_type": "financial_news",
+        "category": "consumer_demand",
+        "source_file": "risk_analysis.jsonl"
+      }
+    },
+    {
+      "id": 3,
+      "instruction": "Answer the finance question using the provided context.",
+      "input": "Context: A company's debt-to-equity ratio compares total debt with shareholders' equity and is commonly used to assess leverage.\nQuestion: What does the debt-to-equity ratio measure?",
+      "reference": "The debt-to-equity ratio measures financial leverage by comparing a company's debt to its shareholders' equity.",
+      "prediction": "The debt-to-equity ratio measures how much debt a company has relative to its shareholders' equity. It helps investors understand whether a company relies too heavily on debt financing.",
+      "metadata": {
+        "task": "financial_qa",
+        "source_type": "manual_gold",
+        "dataset_inspiration": "FiQA",
+        "category": "leverage",
+        "source_file": "financial_qa.jsonl"
+      }
+    },
+    {
+      "id": 4,
+      "instruction": "Summarize the following financial report excerpt.",
+      "input": "International revenue increased by 9%, driven by growth in Asia-Pacific and Latin America. However, foreign exchange movements reduced reported revenue growth by approximately three percentage points.",
+      "reference": "International revenue grew 9%, led by Asia-Pacific and Latin America, though currency headwinds reduced reported growth by about three points.",
+      "prediction": "International revenue grew 9% due to strong Asia-Pacific and Latin American demand, but currency fluctuations reduced reported growth by about three percentage points.",
+      "metadata": {
+        "task": "summarization",
+        "source_type": "sec_style_manual_gold",
+        "document_type": "10-K",
+        "category": "international_revenue",
+        "source_file": "summarization.jsonl"
+      }
+    },
+    {
+      "id": 5,
+      "instruction": "Summarize the following financial report excerpt.",
+      "input": "During the quarter, the company completed the acquisition of a cybersecurity software provider for $650 million. The acquisition is expected to expand the company's enterprise security offerings and contribute modestly to revenue in the next fiscal year.",
+      "reference": "The company acquired a cybersecurity software provider for $650 million to expand enterprise security offerings, with modest revenue contribution expected next year.",
+      "prediction": "The company acquired a cybersecurity provider for $650 million, which will expand enterprise security offerings and contribute modestly to revenue in the next fiscal year.",
+      "metadata": {
+        "task": "summarization",
+        "source_type": "sec_style_manual_gold",
+        "document_type": "10-Q",
+        "category": "acquisition",
+        "source_file": "summarization.jsonl"
+      }
+    },
+    {
+      "id": 6,
+      "instruction": "Answer the finance question using the provided context.",
+      "input": "Context: The company depends on a small number of suppliers for critical components.\nQuestion: Why is supplier concentration risky?",
+      "reference": "Supplier concentration is risky because disruption, price increases, or quality issues at one supplier can delay production and increase costs.",
+      "prediction": "Supplier concentration increases financial and operational risk because disruptions can affect production and supply chain continuity.",
+      "metadata": {
+        "task": "financial_qa",
+        "source_type": "sec_style_manual_gold",
+        "dataset_inspiration": "SEC",
+        "category": "supply_chain",
+        "source_file": "financial_qa.jsonl"
+      }
+    },
+    {
+      "id": 7,
+      "instruction": "Answer the finance question using the provided context.",
+      "input": "Context: Cost of revenue increased because of higher third-party hosting expenses.\nQuestion: How does higher cost of revenue affect gross margin?",
+      "reference": "Higher cost of revenue reduces gross margin if revenue does not increase enough to offset the additional costs.",
+      "prediction": "Higher cost of revenue reduces gross margin because it increases variable costs. Gross margin is calculated as gross profit divided by revenue, and higher cost of revenue reduces gross profit while revenue remains unchanged.",
+      "metadata": {
+        "task": "financial_qa",
+        "source_type": "sec_style_manual_gold",
+        "dataset_inspiration": "SEC",
+        "category": "gross_margin",
+        "source_file": "financial_qa.jsonl"
+      }
+    },
+    {
+      "id": 8,
+      "instruction": "Identify the primary financial or business risk in the following text.",
+      "input": "Revenue from advertising customers declined as businesses reduced marketing budgets during uncertain macroeconomic conditions.",
+      "reference": "Macroeconomic sensitivity and advertising demand risk.",
+      "prediction": "Advertising customer concentration and macroeconomic uncertainty risk.",
+      "metadata": {
+        "task": "risk_analysis",
+        "source_type": "manual_gold",
+        "dataset_inspiration": "Financial PhraseBank",
+        "document_type": "financial_news",
+        "category": "macroeconomic",
+        "source_file": "risk_analysis.jsonl"
+      }
+    },
+    {
+      "id": 9,
+      "instruction": "Identify the primary financial or business risk in the following text.",
+      "input": "The company's top three customers accounted for approximately 42% of total revenue during the fiscal year.",
+      "reference": "Customer concentration risk.",
+      "prediction": "Customer concentration risk.",
+      "metadata": {
+        "task": "risk_analysis",
+        "source_type": "sec_style_manual_gold",
+        "dataset_inspiration": "SEC",
+        "document_type": "10-K",
+        "category": "customer_concentration",
+        "source_file": "risk_analysis.jsonl"
+      }
+    }
+  ]
+}
