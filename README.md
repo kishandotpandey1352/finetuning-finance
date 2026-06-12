@@ -110,3 +110,6 @@ docker exec -it finance-ai-platform python src/training/check_training_setup.py
 
 ### run the evaluation set up 
 docker exec -it finance-ai-platform python src/evaluation/check_eval_setup.py
+
+### run a smoke tets on training the Qwen 2.5-3B-instruct model
+docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_v1.jsonl --output-dir outputs/qlora-finance-smoke-test --max-steps 5 --max-length 256
