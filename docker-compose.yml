@@ -2,13 +2,16 @@ services:
   finance-ai-platform:
     build: .
     container_name: finance-ai-platform
-    ports:
-      - "8000:8000"
     volumes:
       - .:/app
     env_file:
       - .env
-    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    gpus: all
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+    
 
   data-cleaner:
     build: .
