@@ -175,3 +175,43 @@ Results:
 
 Interpretation:
 The fine-tuned adapter produced outputs that were substantially closer to the target finance summaries, risk labels, and QA answers. Because this was an initial small-data experiment, a held-out test set is required for stronger generalization claims.
+
+## day 8 -  increased dataset size to 300 samples
+combined 100 each into a new file:
+
+docker exec -it finance-ai-platform python src/data/combine_gold_dataset.py --input-dir data/instruction/gold --output data/instruction/finance_gold_v2.jsonl --shuffle
+
+-- count numbe rof rows
+docker exec -it finance-ai-platform python -c "import json; p='data/instruction/finance_gold_v2.jsonl'; rows=[json.loads(l) for l in open(p, encoding='utf-8') if l.strip()]; print(len(rows))"
+
+-- 80/20 split
+docker exec -it finance-ai-platform python src/data/split_dataset.py --input data/instruction/finance_gold_v2.jsonl --train-output data/instruction/finance_gold_train.jsonl --test-output data/instruction/finance_gold_test.jsonl --test-size 0.2 --seed 42
+
+docker exec -it finance-ai-platform python src/data/split_dataset.py --input data/instruction/finance_gold_v1.jsonl --train-output data/instruction/finance_gold_train.jsonl --test-output data/instruction/finance_gold_test.jsonl --test-size 0.2 --seed 42
+
+-- run training on train set only:
+
+docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_train.jsonl --output-dir outputs/qlora-finance-run2 --max-steps 150 --max-length 512
+
+
+-- Evaluate base model on test set
+
+docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --output-report reports/evaluation_base_qwen3b_run2_test.json --limit 60 --max-new-tokens 128
+
+
+--Evaluate fine-tuned adapter on test set. This evaluates Qwen + your LoRA adapter:
+
+docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-run2 --output-report reports/evaluation_finetuned_qwen3b_run1_test.json --limit 60 --max-new-tokens 128
+
+---- Test run result on base model Qwen2.5-3B-Instruct::
+
+Metrics:
+rouge1: 0.1944
+rouge2: 0.0658
+rougeL: 0.1610
+rougeLsum: 0.1612
+bertscore_precision: 0.7550
+bertscore_recall: 0.8349
+bertscore_f1: 0.7926
+Evaluation report saved to: reports/evaluation_base_qwen3b_run2_test.json
+
