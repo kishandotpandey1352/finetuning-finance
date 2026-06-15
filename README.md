@@ -244,3 +244,68 @@ docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --da
 
 ### all 3 runs compared
 docker exec -it finance-ai-platform python src/evaluation/compare_reports.py --reports reports/evaluation_base_qwen3b_day9_test.json reports/evaluation_runA_r8_lr2e4.json reports/evaluation_runB_r16_lr2e4.json reports/evaluation_runC_r16_lr1e4.json --names Base RunA-r8-lr2e4 RunB-r16-lr2e4 RunC-r16-lr1e4 --output reports/evaluation_summary_day9.md
+
+### Comparison chart
+| Metric | Base | Run A | **Run B** | Run C |
+|---|---:|---:|---:|---:|
+| ROUGE-1 | 0.1948 | 0.3989 | **0.4566** | 0.4077 |
+| ROUGE-2 | 0.0655 | 0.1925 | **0.2489** | 0.1657 |
+| ROUGE-L | 0.1610 | 0.3321 | **0.3940** | 0.3334 |
+| BERTScore F1 | 0.8751 | 0.9153 | **0.9237** | 0.9142 |
+| Empty predictions | 0 | 0 | **0** | 1 |
+
+## Model Selection Summary
+
+Run B was selected as the best fine-tuned model.
+
+The key metric is **BERTScore F1**, because this project involves text generation tasks where semantic similarity matters. Run B achieved the highest BERTScore F1:
+
+| Model | BERTScore F1 |
+|---|---:|
+| Run B | **0.9237** |
+| Run A | 0.9153 |
+| Run C | 0.9142 |
+| Base | 0.8751 |
+
+Run B also achieved the best **ROUGE-L**, which shows that its responses were closer to the reference answers in wording and structure:
+
+| Model | ROUGE-L |
+|---|---:|
+| Run B | **0.3940** |
+| Run C | 0.3334 |
+| Run A | 0.3321 |
+| Base | 0.1610 |
+
+Run B performed better than Run A because it used a higher LoRA rank:
+
+| Run | LoRA Rank | Learning Rate |
+|---|---:|---:|
+| Run A | 8 | 2e-4 |
+| Run B | 16 | 2e-4 |
+
+The higher LoRA rank gave the adapter more capacity to learn finance-specific response patterns.
+
+Run B also performed better than Run C. Both used LoRA rank 16, but Run C used a lower learning rate:
+
+| Run | LoRA Rank | Learning Rate |
+|---|---:|---:|
+| Run B | 16 | 2e-4 |
+| Run C | 16 | 1e-4 |
+
+Run C produced weaker scores and had one empty prediction, which suggests the lower learning rate may not have adapted the model enough within the same training budget.
+
+## Improvement Over Base Model
+
+| Metric | Base | Run B | Improvement |
+|---|---:|---:|---:|
+| ROUGE-1 | 0.1948 | 0.4566 | +0.2618 |
+| ROUGE-2 | 0.0655 | 0.2489 | +0.1833 |
+| ROUGE-L | 0.1610 | 0.3940 | +0.2330 |
+| BERTScore F1 | 0.8751 | 0.9237 | +0.0486 |
+
+These results show that QLoRA fine-tuning improved the model on the held-out finance test set.
+
+## Final Selected Adapter
+
+```text
+outputs/qlora-finance-runB-r16-lr2e4
