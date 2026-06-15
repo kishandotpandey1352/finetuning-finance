@@ -215,3 +215,32 @@ bertscore_recall: 0.8349
 bertscore_f1: 0.7926
 Evaluation report saved to: reports/evaluation_base_qwen3b_run2_test.json
 
+#### Hyper tuning 
+(6+ minutes to train) - run A
+docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_train.jsonl --output-dir outputs/qlora-finance-runA-r8-lr2e4 --max-steps 150 --max-length 512 --learning-rate 2e-4 --lora-r 8 --lora-alpha 16 --gradient-accumulation-steps 4
+
+(18+ minutes to train) - run B
+docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_train.jsonl --output-dir outputs/qlora-finance-runB-r16-lr2e4 --max-steps 150 --max-length 512 --learning-rate 2e-4 --lora-r 16 --lora-alpha 32 --gradient-accumulation-steps 4
+
+(32+ minutes to train) - run C
+docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_train.jsonl --output-dir outputs/qlora-finance-runC-r16-lr1e4 --max-steps 150 --max-length 512 --learning-rate 1e-4 --lora-r 16 --lora-alpha 32 --gradient-accumulation-steps 4
+
+### Evaluate the models after hyper parameter tuning:
+
+-- base model 
+
+docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --output-report reports/evaluation_base_qwen3b_day9_test.json --limit 60 --max-new-tokens 128
+
+
+--Evaluate each QLoRA run
+## run A evaluated
+docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-runA-r8-lr2e4 --output-report reports/evaluation_runA_r8_lr2e4.json --limit 60 --max-new-tokens 128
+
+## run B evaluated
+docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-runB-r16-lr2e4 --output-report reports/evaluation_runB_r16_lr2e4.json --limit 60 --max-new-tokens 128
+
+## run C evaluated
+docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-runC-r16-lr1e4 --output-report reports/evaluation_runC_r16_lr1e4.json --limit 60 --max-new-tokens 128
+
+### all 3 runs compared
+docker exec -it finance-ai-platform python src/evaluation/compare_reports.py --reports reports/evaluation_base_qwen3b_day9_test.json reports/evaluation_runA_r8_lr2e4.json reports/evaluation_runB_r16_lr2e4.json reports/evaluation_runC_r16_lr1e4.json --names Base RunA-r8-lr2e4 RunB-r16-lr2e4 RunC-r16-lr1e4 --output reports/evaluation_summary_day9.md

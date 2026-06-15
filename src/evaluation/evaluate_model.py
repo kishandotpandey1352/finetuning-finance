@@ -75,33 +75,55 @@ def mock_prediction(record: dict) -> str:
 
 
 def compute_metrics(predictions, references):
-    rouge = evaluate.load("rouge")
+    import evaluate
+    from bert_score import score
 
-    rouge_result = rouge.compute(
-        predictions=predictions,
-        references=references,
+    cleaned_predictions = []
+    cleaned_references = []
+
+    for pred, ref in zip(predictions, references):
+        pred = pred.strip() if isinstance(pred, str) else ""
+        ref = ref.strip() if isinstance(ref, str) else ""
+
+        # BERTScore can crash on empty strings.
+        # Use a harmless placeholder so metric calculation completes.
+        if not pred:
+            pred = "No response generated."
+
+        if not ref:
+            ref = "No reference answer provided."
+
+        cleaned_predictions.append(pred)
+        cleaned_references.append(ref)
+
+    rouge = evaluate.load("rouge")
+    rouge_results = rouge.compute(
+        predictions=cleaned_predictions,
+        references=cleaned_references,
     )
 
     precision, recall, f1 = score(
-        predictions,
-        references,
+        cleaned_predictions,
+        cleaned_references,
         lang="en",
-        model_type="distilbert-base-uncased",
+        model_type="roberta-base",
         verbose=False,
+        use_fast_tokenizer=True,
     )
 
-    bertscore_result = {
-        "bertscore_precision": float(precision.mean()),
-        "bertscore_recall": float(recall.mean()),
-        "bertscore_f1": float(f1.mean()),
+    metrics = {
+        "rouge1": rouge_results["rouge1"],
+        "rouge2": rouge_results["rouge2"],
+        "rougeL": rouge_results["rougeL"],
+        "rougeLsum": rouge_results["rougeLsum"],
+        "bertscore_precision": precision.mean().item(),
+        "bertscore_recall": recall.mean().item(),
+        "bertscore_f1": f1.mean().item(),
+        "empty_predictions": sum(1 for p in predictions if not str(p).strip()),
+        "empty_references": sum(1 for r in references if not str(r).strip()),
     }
 
-    results = {}
-    results.update(rouge_result)
-    results.update(bertscore_result)
-
-    return results
-
+    return metrics
 
 def save_report(output_path: str, metrics: dict, examples: list):
     path = Path(output_path)
