@@ -2,7 +2,7 @@
 
 Project scaffold for financial model finetuning.
 
-# Finance AI Platform
+## Finance AI Platform
 
 A production-style project for fine-tuning and serving an LLM on financial data.
 
@@ -10,13 +10,13 @@ A production-style project for fine-tuning and serving an LLM on financial data.
 
 Build an end-to-end finance AI platform covering:
 
-- dataset curation
-- QLoRA fine-tuning
-- model evaluation
-- vLLM inference
-- quantization benchmarking
-- FastAPI serving
-- Prometheus/Grafana monitoring
+* dataset curation
+* QLoRA fine-tuning
+* model evaluation
+* vLLM inference
+* quantization benchmarking
+* FastAPI serving
+* Prometheus/Grafana monitoring
 
 ## Architecture
 
@@ -24,26 +24,28 @@ See `reports/architecture.md`.
 
 ## Day 1 Status
 
-- [x] Repo created
-- [x] Project structure created
-- [x] Financial PhraseBank download script added
-- [x] Docker environment added
-- [x] Architecture diagram v1 added
+* [x] Repo created
+* [x] Project structure created
+* [x] Financial PhraseBank download script added
+* [x] Docker environment added
+* [x] Architecture diagram v1 added
 
 ## Planned Stack
 
-- Python
-- Hugging Face Datasets
-- Transformers
-- PEFT
-- bitsandbytes
-- vLLM
-- FastAPI
-- Prometheus
-- Grafana
-- Docker
+* Python
+* Hugging Face Datasets
+* Transformers
+* PEFT
+* bitsandbytes
+* vLLM
+* FastAPI
+* Prometheus
+* Grafana
+* Docker
 
-## commands to do intial setup
+## Commands to Do Initial Setup
+
+```bash
 winget install Python.Python.3.11
 python -m venv .venv
 source .venv/bin/activate   # Mac/Linux
@@ -51,70 +53,120 @@ source .venv/bin/activate   # Mac/Linux
 
 pip install datasets pandas pyarrow
 pip freeze > requirements.txt
+```
 
-## to run locally
+## Run Locally
+
+```bash
 docker compose build --no-cache
 docker compose up
 docker ps
+```
+
+Open:
+
+```text
 http://localhost:8000/health
 http://localhost:8000/docs
+```
 
 ## Day 3
-### Run cleaner through Docker:
+
+### Run Cleaner Through Docker
+
+```bash
 docker compose run --rm data-cleaner
-### Run API:
+```
+
+### Run API
+
+```bash
 docker compose up finance-ai-platform --build
+```
 
-#### chunk : sample file created
+### Create Sample File for Chunking
 
+```powershell
 echo Revenue increased by 18 percent due to stronger demand in cloud services. The company also reported higher operating expenses. > data\cleaned\sample.txt
+```
 
+### Run Chunking Script
+
+```powershell
 docker exec -it finance-ai-platform python src/data/chunk.py --input data/cleaned/sample.txt --output data/cleaned/sample_chunks.jsonl
+```
 
-#### see the chunked sample file as output
+### View Chunked Output
 
+```powershell
 docker exec -it finance-ai-platform cat data/cleaned/sample_chunks.jsonl
+```
 
-## day 5: Add instruction dataset preparation and architecture document
--- create instructions
+## Day 5: Add Instruction Dataset Preparation and Architecture Document
+
+### Create Instructions
+
+```powershell
 docker exec -it finance-ai-platform python src/data/prepare_instruction_dataset.py --chunks data/cleaned/sample_chunks.jsonl --output data/instruction/sample_instruction_dataset.jsonl --task summarization
+```
 
--- chek result
+### Check Result
+
+```powershell
 docker exec -it finance-ai-platform cat data/instruction/sample_instruction_dataset.jsonl
+```
 
-## 90 samples of gold dataset combined:
+## 90 Samples of Gold Dataset Combined
+
+```powershell
 docker exec -it finance-ai-platform python src/data/combine_gold_dataset.py --input-dir data/instruction/gold --output data/instruction/finance_gold_v1.jsonl --shuffle
+```
 
--- check combining
+### Check Combining
+
+```powershell
 docker exec -it finance-ai-platform python src/data/combine_gold_dataset.py --input-dir data/instruction/gold --output data/instruction/finance_gold_v1.jsonl --shuffle
+```
 
-## model setup for training
-docker exec -it finance-ai-platform python -c 
+## Model Setup for Training
 
-"from transformers import AutoTokenizer; 
+```powershell
+docker exec -it finance-ai-platform python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('Qwen/Qwen2.5-3B-Instruct'); print('Qwen2.5-3B tokenizer is available or downloaded successfully')"
+```
 
-AutoTokenizer.from_pretrained('Qwen/Qwen2.5-3B-Instruct'); 
+### Check Whether the Model Files Are Already Cached Locally Inside Docker
 
-print('Qwen2.5-3B tokenizer is available or downloaded successfully')"
-
--- To check whether the model files are already cached locally inside Docker
- 
+```powershell
 docker exec -it finance-ai-platform python -c "from huggingface_hub import scan_cache_dir; print(scan_cache_dir())"
+```
 
--- To specifically try loading the model config without loading full weights:
+### Try Loading the Model Config Without Loading Full Weights
 
+```powershell
 docker exec -it finance-ai-platform python -c "from transformers import AutoConfig; cfg=AutoConfig.from_pretrained('Qwen/Qwen2.5-3B-Instruct'); print(cfg.model_type); print(cfg.num_hidden_layers)"
+```
 
-### run the training setup file:
+### Run the Training Setup File
+
+```powershell
 docker exec -it finance-ai-platform python src/training/check_training_setup.py
+```
 
-### run the evaluation set up 
+### Run the Evaluation Setup
+
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/check_eval_setup.py
+```
 
-### run the local training on the Qwen 2.5-3B-instruct model
+### Run Local Training on Qwen2.5-3B-Instruct
+
+```powershell
 docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_v1.jsonl --output-dir outputs/qlora-finance-v1 --max-steps 50 --max-length 512
+```
 
-### After the first run on 90 datasets, following results obtained:
+## First QLoRA Run on 90 Samples
+
+```text
 Model: Qwen/Qwen2.5-3B-Instruct
 Dataset: 90 gold examples
 QLoRA: working
@@ -124,13 +176,19 @@ Trainable %: 0.96%
 Runtime: 121 seconds
 Final train loss: ~1.004
 Adapter saved: outputs/qlora-finance-v1
+```
 
-### Evaluation of the first run
---evaluation against this fine-tuned adapter:
+## Evaluation of the First Run
 
+### Evaluate Fine-Tuned Adapter
+
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_v1.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-v1 --output-report reports/evaluation_finetuned_qwen3b.json --limit 10 --max-new-tokens 128
+```
 
-Eg:
+Example result:
+
+```text
 Metrics:
 rouge1: 0.6265
 rouge2: 0.4084
@@ -140,13 +198,17 @@ bertscore_precision: 0.9197
 bertscore_recall: 0.9305
 bertscore_f1: 0.9250
 Evaluation report saved to: reports/evaluation_finetuned_qwen3b.json
+```
 
---evaluate the base model for comparison:
+### Evaluate Base Model for Comparison
 
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_v1.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --output-report reports/evaluation_base_qwen3b.json --limit 10 --max-new-tokens 128
+```
 
-Eg:
+Example result:
 
+```text
 Metrics:
 rouge1: 0.1807
 rouge2: 0.0860
@@ -159,52 +221,75 @@ Evaluation report saved to: reports/evaluation_base_qwen3b.json
 ================================================================================
 Evaluation complete
 =============================================
+```
 
-\\\Initial QLoRA Experiment Results
+## Initial QLoRA Experiment Results
 
+```text
 Base model: Qwen2.5-3B-Instruct
 Fine-tuning method: QLoRA
 Dataset: 90 manually curated finance instruction examples
 Training steps: 50
 Max sequence length: 512
 Trainable parameters: 29.9M / 3.1B, approximately 0.96%
+```
 
 Results:
-- ROUGE-L improved from 0.1602 to 0.5627
-- BERTScore F1 improved from 0.7898 to 0.9250
+
+* ROUGE-L improved from 0.1602 to 0.5627
+* BERTScore F1 improved from 0.7898 to 0.9250
 
 Interpretation:
+
 The fine-tuned adapter produced outputs that were substantially closer to the target finance summaries, risk labels, and QA answers. Because this was an initial small-data experiment, a held-out test set is required for stronger generalization claims.
 
-## day 8 -  increased dataset size to 300 samples
-combined 100 each into a new file:
+## Day 8: Increased Dataset Size to 300 Samples
 
+Combined 100 samples from each task into a new file:
+
+```powershell
 docker exec -it finance-ai-platform python src/data/combine_gold_dataset.py --input-dir data/instruction/gold --output data/instruction/finance_gold_v2.jsonl --shuffle
+```
 
--- count numbe rof rows
+### Count Number of Rows
+
+```powershell
 docker exec -it finance-ai-platform python -c "import json; p='data/instruction/finance_gold_v2.jsonl'; rows=[json.loads(l) for l in open(p, encoding='utf-8') if l.strip()]; print(len(rows))"
+```
 
--- 80/20 split
+### 80/20 Split
+
+```powershell
 docker exec -it finance-ai-platform python src/data/split_dataset.py --input data/instruction/finance_gold_v2.jsonl --train-output data/instruction/finance_gold_train.jsonl --test-output data/instruction/finance_gold_test.jsonl --test-size 0.2 --seed 42
+```
 
+```powershell
 docker exec -it finance-ai-platform python src/data/split_dataset.py --input data/instruction/finance_gold_v1.jsonl --train-output data/instruction/finance_gold_train.jsonl --test-output data/instruction/finance_gold_test.jsonl --test-size 0.2 --seed 42
+```
 
--- run training on train set only:
+### Run Training on Train Set Only
 
+```powershell
 docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_train.jsonl --output-dir outputs/qlora-finance-run2 --max-steps 150 --max-length 512
+```
 
+### Evaluate Base Model on Test Set
 
--- Evaluate base model on test set
-
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --output-report reports/evaluation_base_qwen3b_run2_test.json --limit 60 --max-new-tokens 128
+```
 
+### Evaluate Fine-Tuned Adapter on Test Set
 
---Evaluate fine-tuned adapter on test set. This evaluates Qwen + your LoRA adapter:
+This evaluates Qwen + the LoRA adapter:
 
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-run2 --output-report reports/evaluation_finetuned_qwen3b_run1_test.json --limit 60 --max-new-tokens 128
+```
 
----- Test run result on base model Qwen2.5-3B-Instruct::
+### Test Run Result on Base Model Qwen2.5-3B-Instruct
 
+```text
 Metrics:
 rouge1: 0.1944
 rouge2: 0.0658
@@ -214,45 +299,75 @@ bertscore_precision: 0.7550
 bertscore_recall: 0.8349
 bertscore_f1: 0.7926
 Evaluation report saved to: reports/evaluation_base_qwen3b_run2_test.json
+```
 
-#### Hyper tuning 
-(6+ minutes to train) - run A
+## Hyperparameter Tuning
+
+### Run A
+
+Training time: `6+ minutes`
+
+```powershell
 docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_train.jsonl --output-dir outputs/qlora-finance-runA-r8-lr2e4 --max-steps 150 --max-length 512 --learning-rate 2e-4 --lora-r 8 --lora-alpha 16 --gradient-accumulation-steps 4
+```
 
-(18+ minutes to train) - run B
+### Run B
+
+Training time: `18+ minutes`
+
+```powershell
 docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_train.jsonl --output-dir outputs/qlora-finance-runB-r16-lr2e4 --max-steps 150 --max-length 512 --learning-rate 2e-4 --lora-r 16 --lora-alpha 32 --gradient-accumulation-steps 4
+```
 
-(32+ minutes to train) - run C
+### Run C
+
+Training time: `32+ minutes`
+
+```powershell
 docker exec -it finance-ai-platform python src/training/train_qlora.py --model-name Qwen/Qwen2.5-3B-Instruct --dataset-path data/instruction/finance_gold_train.jsonl --output-dir outputs/qlora-finance-runC-r16-lr1e4 --max-steps 150 --max-length 512 --learning-rate 1e-4 --lora-r 16 --lora-alpha 32 --gradient-accumulation-steps 4
+```
 
-### Evaluate the models after hyper parameter tuning:
+## Evaluate Models After Hyperparameter Tuning
 
--- base model 
+### Base Model
 
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --output-report reports/evaluation_base_qwen3b_day9_test.json --limit 60 --max-new-tokens 128
+```
 
+### Run A Evaluation
 
---Evaluate each QLoRA run
-## run A evaluated
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-runA-r8-lr2e4 --output-report reports/evaluation_runA_r8_lr2e4.json --limit 60 --max-new-tokens 128
+```
 
-## run B evaluated
+### Run B Evaluation
+
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-runB-r16-lr2e4 --output-report reports/evaluation_runB_r16_lr2e4.json --limit 60 --max-new-tokens 128
+```
 
-## run C evaluated
+### Run C Evaluation
+
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/evaluate_model.py --dataset-path data/instruction/finance_gold_test.jsonl --model-name Qwen/Qwen2.5-3B-Instruct --adapter-path outputs/qlora-finance-runC-r16-lr1e4 --output-report reports/evaluation_runC_r16_lr1e4.json --limit 60 --max-new-tokens 128
+```
 
-### all 3 runs compared
+### Compare All Runs
+
+```powershell
 docker exec -it finance-ai-platform python src/evaluation/compare_reports.py --reports reports/evaluation_base_qwen3b_day9_test.json reports/evaluation_runA_r8_lr2e4.json reports/evaluation_runB_r16_lr2e4.json reports/evaluation_runC_r16_lr1e4.json --names Base RunA-r8-lr2e4 RunB-r16-lr2e4 RunC-r16-lr1e4 --output reports/evaluation_summary_day9.md
+```
 
-### Comparison chart
-| Metric | Base | Run A | **Run B** | Run C |
-|---|---:|---:|---:|---:|
-| ROUGE-1 | 0.1948 | 0.3989 | **0.4566** | 0.4077 |
-| ROUGE-2 | 0.0655 | 0.1925 | **0.2489** | 0.1657 |
-| ROUGE-L | 0.1610 | 0.3321 | **0.3940** | 0.3334 |
-| BERTScore F1 | 0.8751 | 0.9153 | **0.9237** | 0.9142 |
-| Empty predictions | 0 | 0 | **0** | 1 |
+## Comparison Chart
+
+| Metric            |   Base |  Run A |  **Run B** |  Run C |
+| ----------------- | -----: | -----: | ---------: | -----: |
+| ROUGE-1           | 0.1948 | 0.3989 | **0.4566** | 0.4077 |
+| ROUGE-2           | 0.0655 | 0.1925 | **0.2489** | 0.1657 |
+| ROUGE-L           | 0.1610 | 0.3321 | **0.3940** | 0.3334 |
+| BERTScore F1      | 0.8751 | 0.9153 | **0.9237** | 0.9142 |
+| Empty predictions |      0 |      0 |      **0** |      1 |
 
 ## Model Selection Summary
 
@@ -261,47 +376,47 @@ Run B was selected as the best fine-tuned model.
 The key metric is **BERTScore F1**, because this project involves text generation tasks where semantic similarity matters. Run B achieved the highest BERTScore F1:
 
 | Model | BERTScore F1 |
-|---|---:|
-| Run B | **0.9237** |
-| Run A | 0.9153 |
-| Run C | 0.9142 |
-| Base | 0.8751 |
+| ----- | -----------: |
+| Run B |   **0.9237** |
+| Run A |       0.9153 |
+| Run C |       0.9142 |
+| Base  |       0.8751 |
 
 Run B also achieved the best **ROUGE-L**, which shows that its responses were closer to the reference answers in wording and structure:
 
-| Model | ROUGE-L |
-|---|---:|
+| Model |    ROUGE-L |
+| ----- | ---------: |
 | Run B | **0.3940** |
-| Run C | 0.3334 |
-| Run A | 0.3321 |
-| Base | 0.1610 |
+| Run C |     0.3334 |
+| Run A |     0.3321 |
+| Base  |     0.1610 |
 
 Run B performed better than Run A because it used a higher LoRA rank:
 
-| Run | LoRA Rank | Learning Rate |
-|---|---:|---:|
-| Run A | 8 | 2e-4 |
-| Run B | 16 | 2e-4 |
+| Run   | LoRA Rank | Learning Rate |
+| ----- | --------: | ------------: |
+| Run A |         8 |          2e-4 |
+| Run B |        16 |          2e-4 |
 
 The higher LoRA rank gave the adapter more capacity to learn finance-specific response patterns.
 
 Run B also performed better than Run C. Both used LoRA rank 16, but Run C used a lower learning rate:
 
-| Run | LoRA Rank | Learning Rate |
-|---|---:|---:|
-| Run B | 16 | 2e-4 |
-| Run C | 16 | 1e-4 |
+| Run   | LoRA Rank | Learning Rate |
+| ----- | --------: | ------------: |
+| Run B |        16 |          2e-4 |
+| Run C |        16 |          1e-4 |
 
 Run C produced weaker scores and had one empty prediction, which suggests the lower learning rate may not have adapted the model enough within the same training budget.
 
 ## Improvement Over Base Model
 
-| Metric | Base | Run B | Improvement |
-|---|---:|---:|---:|
-| ROUGE-1 | 0.1948 | 0.4566 | +0.2618 |
-| ROUGE-2 | 0.0655 | 0.2489 | +0.1833 |
-| ROUGE-L | 0.1610 | 0.3940 | +0.2330 |
-| BERTScore F1 | 0.8751 | 0.9237 | +0.0486 |
+| Metric       |   Base |  Run B | Improvement |
+| ------------ | -----: | -----: | ----------: |
+| ROUGE-1      | 0.1948 | 0.4566 |     +0.2618 |
+| ROUGE-2      | 0.0655 | 0.2489 |     +0.1833 |
+| ROUGE-L      | 0.1610 | 0.3940 |     +0.2330 |
+| BERTScore F1 | 0.8751 | 0.9237 |     +0.0486 |
 
 These results show that QLoRA fine-tuning improved the model on the held-out finance test set.
 
@@ -309,3 +424,4 @@ These results show that QLoRA fine-tuning improved the model on the held-out fin
 
 ```text
 outputs/qlora-finance-runB-r16-lr2e4
+```
