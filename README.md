@@ -425,3 +425,32 @@ These results show that QLoRA fine-tuning improved the model on the held-out fin
 ```text
 outputs/qlora-finance-runB-r16-lr2e4
 ```
+# Day 11 - setting up the vLLM and running the llm qwen2.2-1.5B- instruct
+
+added the server section for vLLM in the docker file
+ran following commands::
+    docker compose down
+    docker compose up vllm-server
+
+Test:
+    curl.exe http://localhost:8001/v1/models
+    
+Response:
+
+    {"object":"list","data":[{"id":"finance-qwen1.5b","object":"model","created":1781640354,"owned_by":"vllm","root":"Qwen/Qwen2.5-1.5B-Instruct","parent":null,"max_model_len":1024,"permission":[{"id":"modelperm-aedd9ed3e5e55381","object":"model_permission","created":1781640354,"allow_create_engine":false,"allow_sampling":true,"allow_logprobs":true,"allow_search_indices":false,"allow_view":true,"allow_fine_tuning":false,"organization":"*","group":null,"is_blocking":false}]}]}
+
+
+
+## Day 11 Serving Result
+
+The vLLM server was successfully deployed and tested through the OpenAI-compatible chat completion endpoint.
+
+Served model:
+
+```text
+finance-qwen1.5b
+
+
+Test endpoint: http://localhost:8001/v1/chat/completions
+
+-- Qwen2.5-3B-Instruct was initially tested, but the local 8GB GPU did not have enough remaining memory for KV cache blocks after loading the model weights. For the Day 11 serving deliverable, Qwen2.5-1.5B-Instruct was used as the reliable local serving model.
