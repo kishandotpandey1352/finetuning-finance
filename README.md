@@ -434,7 +434,7 @@ ran following commands::
 
 Test:
     curl.exe http://localhost:8001/v1/models
-    
+
 Response:
 
     {"object":"list","data":[{"id":"finance-qwen1.5b","object":"model","created":1781640354,"owned_by":"vllm","root":"Qwen/Qwen2.5-1.5B-Instruct","parent":null,"max_model_len":1024,"permission":[{"id":"modelperm-aedd9ed3e5e55381","object":"model_permission","created":1781640354,"allow_create_engine":false,"allow_sampling":true,"allow_logprobs":true,"allow_search_indices":false,"allow_view":true,"allow_fine_tuning":false,"organization":"*","group":null,"is_blocking":false}]}]}
@@ -454,3 +454,25 @@ finance-qwen1.5b
 Test endpoint: http://localhost:8001/v1/chat/completions
 
 -- Qwen2.5-3B-Instruct was initially tested, but the local 8GB GPU did not have enough remaining memory for KV cache blocks after loading the model weights. For the Day 11 serving deliverable, Qwen2.5-1.5B-Instruct was used as the reliable local serving model.
+
+## Benchmarking throughput and latency
+
+python src/inference/benchmark_latency.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 10 --max-tokens 128 --output reports/latency_benchmark_day12.json
+
+python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 4 --max-tokens 128 --output reports/throughput_benchmark_day12.json
+
+### inside docker (optional commands as above two)
+
+docker exec -it finance-ai-platform python src/inference/benchmark_latency.py --base-url http://host.docker.internal:8001 --model finance-qwen1.5b --num-requests 10 --max-tokens 128 --output reports/latency_benchmark_day12.json
+
+docker exec -it finance-ai-platform python src/inference/benchmark_throughput.py --base-url http://host.docker.internal:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 4 --max-tokens 128 --output reports/throughput_benchmark_day12.json
+
+### commands to use in sequence for benchmarking::
+
+curl.exe http://localhost:8001/v1/models
+
+python src/inference/benchmark_latency.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 10 --max-tokens 128 --output reports/latency_benchmark_day12.json
+
+python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 2 --max-tokens 128 --output reports/throughput_benchmark_day12_c2.json
+
+python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 4 --max-tokens 128 --output reports/throughput_benchmark_day12_c4.json
