@@ -476,3 +476,34 @@ python src/inference/benchmark_latency.py --base-url http://localhost:8001 --mod
 python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 2 --max-tokens 128 --output reports/throughput_benchmark_day12_c2.json
 
 python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 4 --max-tokens 128 --output reports/throughput_benchmark_day12_c4.json
+
+## Day 13 Summary
+
+Day 13 extended the initial Day 12 benchmark by testing different generation lengths and concurrency levels.
+
+The latency experiments show the cost of generating longer responses. The throughput experiments show how vLLM handles multiple simultaneous finance prompts.
+
+This benchmark helps identify a practical local serving configuration for the project. On the RTX 5060 Laptop GPU with ~8GB VRAM, `finance-qwen1.5b` is the reliable local vLLM serving model, while Qwen2.5-3B remains the local fine-tuning target.
+
+commands ran::
+
+python src/inference/benchmark_latency.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 10 --max-tokens 64 --output reports/latency_day13_t64.json
+
+python src/inference/benchmark_latency.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 10 --max-tokens 128 --output reports/latency_day13_t128.json
+
+python src/inference/benchmark_latency.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 10 --max-tokens 256 --output reports/latency_day13_t256.json
+
+throughput benchmarks::
+
+python src/inference/benchmark_latency.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 10 --max-tokens 64 --output reports/latency_day13_t64.json
+
+python src/inference/benchmark_latency.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 10 --max-tokens 128 --output reports/latency_day13_t128.json
+
+python src/inference/benchmark_latency.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 10 --max-tokens 256 --output reports/latency_day13_t256.json
+
+## concurrency::
+python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 1 --max-tokens 128 --output reports/throughput_day13_c1.json
+
+python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 2 --max-tokens 128 --output reports/throughput_day13_c2.json
+
+python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 4 --max-tokens 128 --output reports/throughput_day13_c4.json

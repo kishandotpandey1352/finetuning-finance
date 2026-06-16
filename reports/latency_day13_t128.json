@@ -1,0 +1,91 @@
+{
+  "model": "finance-qwen1.5b",
+  "base_url": "http://localhost:8001",
+  "num_requests": 10,
+  "max_tokens": 128,
+  "latency_seconds": {
+    "min": 0.40097449999302626,
+    "max": 0.5405017000157386,
+    "mean": 0.46674491999438034,
+    "median_p50": 0.4756648500042502,
+    "p95": 0.5241545999888331
+  },
+  "tokens": {
+    "total_tokens": 856,
+    "completion_tokens": 296,
+    "average_total_tokens_per_request": 85.6,
+    "average_completion_tokens_per_request": 29.6
+  },
+  "individual_results": [
+    {
+      "latency_seconds": 0.5405017000157386,
+      "prompt_tokens": 56,
+      "completion_tokens": 28,
+      "total_tokens": 84,
+      "response": "The company's revenue grew by 18%, however, its operating expenses increased as well because of the rise in cloud infrastructure costs."
+    },
+    {
+      "latency_seconds": 0.49396559997694567,
+      "prompt_tokens": 56,
+      "completion_tokens": 30,
+      "total_tokens": 86,
+      "response": "The company reported an increase in revenue of 18%, however, the rise in operating expenses was attributed to higher costs associated with cloud infrastructure."
+    },
+    {
+      "latency_seconds": 0.40097449999302626,
+      "prompt_tokens": 56,
+      "completion_tokens": 26,
+      "total_tokens": 82,
+      "response": "The company's revenue grew by 18%, however, the operational expenditures increased because of greater investments in cloud computing resources."
+    },
+    {
+      "latency_seconds": 0.4861895000212826,
+      "prompt_tokens": 56,
+      "completion_tokens": 32,
+      "total_tokens": 88,
+      "response": "The company reported an increase in revenue of 18%, however, there was also a rise in operating expenses as a result of increased cloud infrastructure costs."
+    },
+    {
+      "latency_seconds": 0.42261589999543503,
+      "prompt_tokens": 56,
+      "completion_tokens": 28,
+      "total_tokens": 84,
+      "response": "The company's revenue grew by 18%, however, its operating expenses increased as well because of the rise in cloud infrastructure costs."
+    },
+    {
+      "latency_seconds": 0.5241545999888331,
+      "prompt_tokens": 56,
+      "completion_tokens": 34,
+      "total_tokens": 90,
+      "response": "The company reported an increase in revenue of 18%, however, there was also a rise in operating expenses as a result of increased costs associated with cloud infrastructure."
+    },
+    {
+      "latency_seconds": 0.4228562999633141,
+      "prompt_tokens": 56,
+      "completion_tokens": 28,
+      "total_tokens": 84,
+      "response": "The company's revenue grew by 18%, however, the increase in operating expenses was attributed to higher costs associated with cloud infrastructure."
+    },
+    {
+      "latency_seconds": 0.42477570002665743,
+      "prompt_tokens": 56,
+      "completion_tokens": 28,
+      "total_tokens": 84,
+      "response": "The company's revenue grew by 18%, however, its operating expenses increased as well because of the rise in cloud infrastructure costs."
+    },
+    {
+      "latency_seconds": 0.48627519997535273,
+      "prompt_tokens": 56,
+      "completion_tokens": 32,
+      "total_tokens": 88,
+      "response": "The company reported an increase in revenue of 18%, however, there was also a rise in operating expenses as a result of increased cloud infrastructure costs."
+    },
+    {
+      "latency_seconds": 0.4651401999872178,
+      "prompt_tokens": 56,
+      "completion_tokens": 30,
+      "total_tokens": 86,
+      "response": "The company reported an increase in revenue of 18%, however, the rise in operating expenses was attributed to elevated costs associated with cloud infrastructure."
+    }
+  ]
+}

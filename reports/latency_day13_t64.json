@@ -1,0 +1,91 @@
+{
+  "model": "finance-qwen1.5b",
+  "base_url": "http://localhost:8001",
+  "num_requests": 10,
+  "max_tokens": 64,
+  "latency_seconds": {
+    "min": 0.4168137999949977,
+    "max": 0.9469669999671169,
+    "mean": 0.5735460999887436,
+    "median_p50": 0.4694033499690704,
+    "p95": 0.8512903999653645
+  },
+  "tokens": {
+    "total_tokens": 917,
+    "completion_tokens": 357,
+    "average_total_tokens_per_request": 91.7,
+    "average_completion_tokens_per_request": 35.7
+  },
+  "individual_results": [
+    {
+      "latency_seconds": 0.7725070000160486,
+      "prompt_tokens": 56,
+      "completion_tokens": 28,
+      "total_tokens": 84,
+      "response": "The company's revenue grew by 18%, however, its operating expenses increased as well because of the rise in cloud infrastructure costs."
+    },
+    {
+      "latency_seconds": 0.48720169998705387,
+      "prompt_tokens": 56,
+      "completion_tokens": 30,
+      "total_tokens": 86,
+      "response": "The company reported an increase in revenue of 18%, however, the rise in operating expenses was attributed to elevated costs associated with cloud infrastructure."
+    },
+    {
+      "latency_seconds": 0.8512903999653645,
+      "prompt_tokens": 56,
+      "completion_tokens": 57,
+      "total_tokens": 113,
+      "response": "The company reported an increase in revenue of 18%, however, the rise in operating expenses was attributed to higher costs associated with cloud infrastructure. This indicates that while there has been growth in overall sales, the additional expenditures on technology and services have contributed to the overall cost structure."
+    },
+    {
+      "latency_seconds": 0.4168137999949977,
+      "prompt_tokens": 56,
+      "completion_tokens": 28,
+      "total_tokens": 84,
+      "response": "The company's revenue grew by 18%, however, its operating expenses increased as well because of the rise in cloud infrastructure costs."
+    },
+    {
+      "latency_seconds": 0.5083521000342444,
+      "prompt_tokens": 56,
+      "completion_tokens": 34,
+      "total_tokens": 90,
+      "response": "The company reported an increase in revenue of 18%, however, there was also a rise in operating expenses as a result of higher costs associated with cloud infrastructure."
+    },
+    {
+      "latency_seconds": 0.4309110000031069,
+      "prompt_tokens": 56,
+      "completion_tokens": 28,
+      "total_tokens": 84,
+      "response": "The company's revenue grew by 18%, however, its operating expenses increased as well because of the rise in cloud infrastructure costs."
+    },
+    {
+      "latency_seconds": 0.44558739999774843,
+      "prompt_tokens": 56,
+      "completion_tokens": 30,
+      "total_tokens": 86,
+      "response": "The company reported an increase in revenue of 18%, however, the rise in operating expenses was attributed to elevated costs associated with cloud infrastructure."
+    },
+    {
+      "latency_seconds": 0.42422559997066855,
+      "prompt_tokens": 56,
+      "completion_tokens": 28,
+      "total_tokens": 84,
+      "response": "The company's revenue grew by 18%, however, its operating expenses increased as well because of the rise in cloud infrastructure costs."
+    },
+    {
+      "latency_seconds": 0.45160499995108694,
+      "prompt_tokens": 56,
+      "completion_tokens": 30,
+      "total_tokens": 86,
+      "response": "The company reported an increase in revenue of 18%, however, the rise in operating expenses was attributed to elevated costs associated with cloud infrastructure."
+    },
+    {
+      "latency_seconds": 0.9469669999671169,
+      "prompt_tokens": 56,
+      "completion_tokens": 64,
+      "total_tokens": 120,
+      "response": "The company reported an increase in revenue of 18%, however, the rise in operating expenses was attributed to higher costs associated with cloud infrastructure. This suggests that while there has been growth in overall sales, the efficiency and cost management within the business have not kept pace, potentially impacting profitability or necessitating adjustments in pricing strategies"
+    }
+  ]
+}
