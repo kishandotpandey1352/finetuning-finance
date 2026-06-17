@@ -507,3 +507,26 @@ python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --
 python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 2 --max-tokens 128 --output reports/throughput_day13_c2.json
 
 python src/inference/benchmark_throughput.py --base-url http://localhost:8001 --model finance-qwen1.5b --num-requests 20 --concurrency 4 --max-tokens 128 --output reports/throughput_day13_c4.json
+
+## Day 14 -  Quanization & Benchamarking
+
+INT 8 -  quantization
+
+docker exec -it finance-ai-platform python src/inference/benchmark_quantization.py --model-name Qwen/Qwen2.5-3B-Instruct --quantization int8 --num-requests 5 --max-new-tokens 128 --output reports/quantization_int8_day14.json
+
+Notes;: Qwen2.5-3B loads with lower memory than FP16
+Latency and tokens/sec are recorded
+Report saved to reports/quantization_int8_day14.json
+
+INT 4 - quantization
+
+docker exec -it finance-ai-platform python src/inference/benchmark_quantization.py --model-name Qwen/Qwen2.5-3B-Instruct --quantization int4 --num-requests 5 --max-new-tokens 128 --output reports/quantization_int4_day14.json
+
+fp16 - quantization
+
+docker exec -it finance-ai-platform python src/inference/benchmark_quantization.py --model-name Qwen/Qwen2.5-3B-Instruct --quantization fp16 --num-requests 5 --max-new-tokens 128 --output reports/quantization_fp16_day14.json                                                  
+
+
+--comparison report
+
+docker exec -it finance-ai-platform python src/inference/compare_quantization_reports.py --reports FP16=reports/quantization_fp16_day14.json INT8=reports/quantization_int8_day14.json INT4=reports/quantization_int4_day14.json --output reports/quantization_comparison_day14.md

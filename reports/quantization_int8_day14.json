@@ -1,0 +1,70 @@
+{
+  "model_name": "Qwen/Qwen2.5-3B-Instruct",
+  "quantization": "int8",
+  "num_requests": 5,
+  "max_new_tokens": 128,
+  "load_time_seconds": 18.748474824002187,
+  "latency_seconds": {
+    "min": 4.935034295995138,
+    "max": 7.598141577000206,
+    "mean": 5.507086370198522,
+    "p50": 5.012894127998152,
+    "p95": 5.020730421994813
+  },
+  "tokens": {
+    "total_completion_tokens": 170,
+    "total_tokens": 515,
+    "average_completion_tokens": 34,
+    "average_total_tokens": 103,
+    "mean_completion_tokens_per_second": 6.352331520439162
+  },
+  "memory": {
+    "cuda_available": true,
+    "allocated_gb": 3.201648235321045,
+    "reserved_gb": 3.318359375,
+    "max_allocated_gb": 3.245476722717285,
+    "max_reserved_gb": 3.318359375
+  },
+  "individual_results": [
+    {
+      "latency_seconds": 7.598141577000206,
+      "prompt_tokens": 69,
+      "completion_tokens": 34,
+      "total_tokens": 103,
+      "completion_tokens_per_second": 4.474778425150563,
+      "response": "The company's revenue grew by 18% driven by increased enterprise demand. However, operating expenses have risen due to higher cloud infrastructure costs and increased employee compensation."
+    },
+    {
+      "latency_seconds": 5.012894127998152,
+      "prompt_tokens": 69,
+      "completion_tokens": 34,
+      "total_tokens": 103,
+      "completion_tokens_per_second": 6.7825090919240205,
+      "response": "The company's revenue grew by 18% driven by increased enterprise demand. However, operating expenses have risen due to higher cloud infrastructure costs and increased employee compensation."
+    },
+    {
+      "latency_seconds": 5.020730421994813,
+      "prompt_tokens": 69,
+      "completion_tokens": 34,
+      "total_tokens": 103,
+      "completion_tokens_per_second": 6.771923035551326,
+      "response": "The company's revenue grew by 18% driven by increased enterprise demand. However, operating expenses have risen due to higher cloud infrastructure costs and increased employee compensation."
+    },
+    {
+      "latency_seconds": 4.935034295995138,
+      "prompt_tokens": 69,
+      "completion_tokens": 34,
+      "total_tokens": 103,
+      "completion_tokens_per_second": 6.889516457381373,
+      "response": "The company's revenue grew by 18% driven by increased enterprise demand. However, operating expenses have risen due to higher cloud infrastructure costs and increased employee compensation."
+    },
+    {
+      "latency_seconds": 4.968631428004301,
+      "prompt_tokens": 69,
+      "completion_tokens": 34,
+      "total_tokens": 103,
+      "completion_tokens_per_second": 6.8429305921885275,
+      "response": "The company's revenue grew by 18% driven by increased enterprise demand. However, operating expenses have risen due to higher cloud infrastructure costs and increased employee compensation."
+    }
+  ]
+}
