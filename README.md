@@ -572,3 +572,15 @@ python src/api/load_test_qa.py --base-url http://localhost:8000 --num-requests 2
 python src/api/load_test_qa.py --base-url http://localhost:8000 --num-requests 20 --concurrency 2 --output reports/load_test_qa_day17_c2.json
 
 python src/api/load_test_qa.py --base-url http://localhost:8000 --num-requests 20 --concurrency 4 --output reports/load_test_qa_day17_c4.json
+
+day 18: 
+docker compose restart finance-ai-platform
+curl.exe http://localhost:8000/health
+curl.exe http://localhost:8001/v1/models
+
+python src/api/profile_api_performance.py --base-url http://localhost:8000 --num-requests 3 --concurrency 1 --output-json reports/api_profile_day18_small.json --output-md reports/api_profile_day18_small.md
+
+
+python src/api/profile_api_performance.py --base-url http://localhost:8000 --num-requests 10 --concurrency 2 --output-json reports/api_performance_profile_day18.json --output-md reports/api_performance_profile_day18.md
+
+python src/api/profile_api_performance.py --base-url http://localhost:8000 --num-requests 20 --concurrency 4 --output-json reports/api_performance_profile_day18_c4.json --output-md reports/api_performance_profile_day18_c4.md

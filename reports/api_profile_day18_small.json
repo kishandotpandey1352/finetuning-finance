@@ -1,0 +1,76 @@
+{
+  "base_url": "http://localhost:8000",
+  "num_requests": 3,
+  "concurrency": 1,
+  "endpoints": [
+    {
+      "endpoint": "/summarize",
+      "total_time_seconds": 1.8045609000255354,
+      "requests": 3,
+      "successful_requests": 3,
+      "failed_requests": 0,
+      "requests_per_second": 1.6624542845617172,
+      "latency_seconds": {
+        "min": 0.5700530000030994,
+        "max": 0.6187027999549173,
+        "mean": 0.6008792333304882,
+        "p50": 0.6138819000334479,
+        "p95": 0.6138819000334479
+      },
+      "tokens": {
+        "prompt_tokens": 291,
+        "completion_tokens": 112,
+        "total_tokens": 403,
+        "total_tokens_per_second": 223.32302555945736,
+        "completion_tokens_per_second": 62.064959956970775
+      },
+      "sample_errors": []
+    },
+    {
+      "endpoint": "/qa",
+      "total_time_seconds": 2.27424559998326,
+      "requests": 3,
+      "successful_requests": 3,
+      "failed_requests": 0,
+      "requests_per_second": 1.3191187442649475,
+      "latency_seconds": {
+        "min": 0.7062377999536693,
+        "max": 0.8159615999902599,
+        "mean": 0.7577422333221572,
+        "p50": 0.7510273000225425,
+        "p95": 0.7510273000225425
+      },
+      "tokens": {
+        "prompt_tokens": 366,
+        "completion_tokens": 170,
+        "total_tokens": 536,
+        "total_tokens_per_second": 235.68254897533728,
+        "completion_tokens_per_second": 74.7500621750137
+      },
+      "sample_errors": []
+    },
+    {
+      "endpoint": "/risk-analysis",
+      "total_time_seconds": 7.49957970000105,
+      "requests": 3,
+      "successful_requests": 3,
+      "failed_requests": 0,
+      "requests_per_second": 0.400022417256207,
+      "latency_seconds": {
+        "min": 2.4363210000446998,
+        "max": 2.567490099987481,
+        "mean": 2.499555033359987,
+        "p50": 2.4948540000477806,
+        "p95": 2.4948540000477806
+      },
+      "tokens": {
+        "prompt_tokens": 468,
+        "completion_tokens": 576,
+        "total_tokens": 1044,
+        "total_tokens_per_second": 139.20780120516005,
+        "completion_tokens_per_second": 76.80430411319175
+      },
+      "sample_errors": []
+    }
+  ]
+}
