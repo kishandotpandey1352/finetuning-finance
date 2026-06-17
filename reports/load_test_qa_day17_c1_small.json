@@ -1,0 +1,112 @@
+{
+  "endpoint": "/qa",
+  "base_url": "http://localhost:8000",
+  "num_requests": 5,
+  "concurrency": 1,
+  "total_time_seconds": 4.507476800004952,
+  "successful_requests": 5,
+  "failed_requests": 0,
+  "requests_per_second": 1.1092680499197483,
+  "latency_seconds": {
+    "min": 0.27685229998314753,
+    "max": 1.7002752000116743,
+    "mean": 0.9008978400030173,
+    "p50": 0.8604645999730565,
+    "p95": 0.9834708000416867
+  },
+  "tokens": {
+    "prompt_tokens": 591,
+    "completion_tokens": 312,
+    "total_tokens": 903,
+    "total_tokens_per_second": 200.33380981550656,
+    "completion_tokens_per_second": 69.2183263149923
+  },
+  "errors": [],
+  "individual_results": [
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.9834708000416867,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Operating margin declined because despite revenue increasing by 18%, operating expenses also increased. Specifically, this increase was driven by higher cloud infrastructure costs and employee compensation. The net effect of these increases led to a decrease in the ratio of operating income to total revenues, resulting in a lower operating margin.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.8843431069981307,
+        "usage": {
+          "prompt_tokens": 122,
+          "completion_tokens": 60,
+          "total_tokens": 182
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.6834263000055216,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The main business drivers of revenue growth mentioned in the context were:\n1. Stronger enterprise demand\n2. Higher renewal rates\n3. Increased adoption of premium products\nThese factors collectively led to revenue growth during the specified quarter.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.6798883200099226,
+        "usage": {
+          "prompt_tokens": 118,
+          "completion_tokens": 47,
+          "total_tokens": 165
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.27685229998314753,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The key risk mentioned in the update is foreign exchange pressure and rising infrastructure costs.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.255344140008674,
+        "usage": {
+          "prompt_tokens": 114,
+          "completion_tokens": 17,
+          "total_tokens": 131
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.7002752000116743,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Investors should interpret this cash flow trend as follows:\n\n1. **Operating Cash Flow Improvement**: The operating cash flow has increased from one year to another, which indicates that companies are generating more revenue or reducing expenses without affecting their ability to pay dividends or invest in growth.\n\n2. **Better Collections and Disciplined Working Capital Management**: These factors suggest efficient operations and effective use of resources, leading to higher profitability and potentially lower costs associated with inventory, accounts receivable, and other working capital items.\n\n3. **Capital Expenditures Remain Elevated**: Despite the increase in operating cash flow, capital expenditures (investments in long-term assets)",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 1.673649017000571,
+        "usage": {
+          "prompt_tokens": 115,
+          "completion_tokens": 128,
+          "total_tokens": 243
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.8604645999730565,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Operating margin declined because despite revenue increasing by 18%, operating expenses also increased. Specifically, this increase was driven by higher cloud infrastructure costs and employee compensation. The net effect of these increases led to a decrease in the ratio of operating income to total revenues, resulting in a lower operating margin.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.8565241360047366,
+        "usage": {
+          "prompt_tokens": 122,
+          "completion_tokens": 60,
+          "total_tokens": 182
+        }
+      },
+      "error": null
+    }
+  ]
+}

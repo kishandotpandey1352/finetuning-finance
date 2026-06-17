@@ -554,3 +554,21 @@ curl.exe http://localhost:8001/v1/models
 
 # to check if the fastapi is running:
 curl.exe http://localhost:8000/health
+
+Day 17: add /qa endpoint
+
+Restart FastAPI::
+docker compose restart finance-ai-platform
+Make sure vLLM is running:
+curl.exe http://localhost:8001/v1/models
+Make sure FastAPI is running:
+curl.exe http://localhost:8000/health
+
+#### run load test::
+python src/api/load_test_qa.py --base-url http://localhost:8000 --num-requests 5 --concurrency 1 --output reports/load_test_qa_day17_c1_small.json
+
+python src/api/load_test_qa.py --base-url http://localhost:8000 --num-requests 20 --concurrency 1 --output reports/load_test_qa_day17_c1.json
+
+python src/api/load_test_qa.py --base-url http://localhost:8000 --num-requests 20 --concurrency 2 --output reports/load_test_qa_day17_c2.json
+
+python src/api/load_test_qa.py --base-url http://localhost:8000 --num-requests 20 --concurrency 4 --output reports/load_test_qa_day17_c4.json

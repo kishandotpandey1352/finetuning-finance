@@ -1,0 +1,367 @@
+{
+  "endpoint": "/qa",
+  "base_url": "http://localhost:8000",
+  "num_requests": 20,
+  "concurrency": 4,
+  "total_time_seconds": 6.15841430000728,
+  "successful_requests": 20,
+  "failed_requests": 0,
+  "requests_per_second": 3.2475892373750104,
+  "latency_seconds": {
+    "min": 0.2934127999469638,
+    "max": 2.308146899973508,
+    "mean": 1.0413340549974237,
+    "p50": 0.8766308999620378,
+    "p95": 2.0498043000116013
+  },
+  "tokens": {
+    "prompt_tokens": 2345,
+    "completion_tokens": 1250,
+    "total_tokens": 3595,
+    "total_tokens_per_second": 583.7541654181581,
+    "completion_tokens_per_second": 202.97432733593814
+  },
+  "errors": [],
+  "individual_results": [
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.5763888999936171,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The key risk mentioned in the update is foreign exchange pressure and rising infrastructure costs.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.5001213840005221,
+        "usage": {
+          "prompt_tokens": 114,
+          "completion_tokens": 17,
+          "total_tokens": 131
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.0513371000415646,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The main business drivers of revenue growth mentioned in the context were:\n1. Stronger enterprise demand\n2. Higher renewal rates\n3. Increased adoption of premium products\nThese factors collectively led to revenue growth during the specified quarter.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.9904525119927712,
+        "usage": {
+          "prompt_tokens": 118,
+          "completion_tokens": 47,
+          "total_tokens": 165
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.1236774999997579,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Operating margin declined because despite revenue increasing by 18%, operating expenses also increased. Specifically, this increase was driven by higher cloud infrastructure costs and employee compensation. These additional expenses reduced the overall profitability relative to revenue, leading to a decrease in the operating margin.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 1.0689064180041896,
+        "usage": {
+          "prompt_tokens": 122,
+          "completion_tokens": 53,
+          "total_tokens": 175
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.31682160001946613,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The key risk mentioned in the update is foreign exchange pressure and rising infrastructure costs.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.31126695800048765,
+        "usage": {
+          "prompt_tokens": 114,
+          "completion_tokens": 17,
+          "total_tokens": 131
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.9971719000022858,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Operating margin declined because despite revenue increasing by 18%, operating expenses also increased. Specifically, this increase was driven by higher cloud infrastructure costs and employee compensation. The net effect of these factors led to a decrease in the ratio of operating income to total revenue, resulting in a lower operating margin.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.9933404890034581,
+        "usage": {
+          "prompt_tokens": 122,
+          "completion_tokens": 60,
+          "total_tokens": 182
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.7929517999873497,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The main business drivers of revenue growth mentioned in the context were:\n1. Stronger enterprise demand\n2. Higher renewal rates\n3. Increased adoption of premium products\nThese factors collectively led to revenue growth during the specified quarter.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.778851039998699,
+        "usage": {
+          "prompt_tokens": 118,
+          "completion_tokens": 47,
+          "total_tokens": 165
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 2.308146899973508,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Investors should interpret this cash flow trend as follows:\n\n1. **Operating Cash Flow Improvement**: The operating cash flow has increased from one year to another, which indicates that companies have been able to generate more cash from their core business operations. This suggests efficiency in managing day-to-day activities and potentially higher profitability.\n\n2. **Disciplined Working Capital Management**: The improvement in operating cash flow can be attributed to better collections and disciplined working capital management. This means that companies are effectively managing their short-term assets and liabilities, reducing waste and improving liquidity.\n\n3. **Capital Expenditures (CapEx) Elevation**: Despite the increase in",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 2.227222945992253,
+        "usage": {
+          "prompt_tokens": 115,
+          "completion_tokens": 128,
+          "total_tokens": 243
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.8859960999689065,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Operating margin declined because despite revenue increasing by 18%, operating expenses also increased. Specifically, this increase was driven by higher cloud infrastructure costs and employee compensation. These additional expenses reduced the profit margin relative to revenue, leading to an overall decrease in operating margin.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.872885218996089,
+        "usage": {
+          "prompt_tokens": 122,
+          "completion_tokens": 53,
+          "total_tokens": 175
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.7969004999613389,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The main business drivers of revenue growth mentioned in the context were:\n1. Stronger enterprise demand\n2. Higher renewal rates\n3. Increased adoption of premium products\nThese factors collectively led to revenue growth during the specified quarter.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.7922006910084747,
+        "usage": {
+          "prompt_tokens": 118,
+          "completion_tokens": 47,
+          "total_tokens": 165
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.35949190001701936,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The key risk mentioned in the update is foreign exchange pressure and rising infrastructure costs.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.3429164950066479,
+        "usage": {
+          "prompt_tokens": 114,
+          "completion_tokens": 17,
+          "total_tokens": 131
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.7702970000100322,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The main business drivers of revenue growth mentioned in the context were:\n1. Stronger enterprise demand\n2. Higher renewal rates\n3. Increased adoption of premium products\nThese factors collectively led to revenue growth during the specified quarter.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.7463093330006814,
+        "usage": {
+          "prompt_tokens": 118,
+          "completion_tokens": 47,
+          "total_tokens": 165
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 2.0498043000116013,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Investors should interpret this cash flow trend as follows:\n\n1. **Operating Cash Flow Improvement**: The operating cash flow has increased from one year to the next, which indicates that companies are generating more revenue than they're spending on day-to-day operations. This suggests operational efficiency and potentially higher profitability.\n\n2. **Disciplined Working Capital Management**: The improvement in operating cash flow can be attributed to better collections and disciplined working capital management. This means that companies are managing their working capital effectively, reducing waste and improving liquidity.\n\n3. **Capital Expenditures (CapEx) Elevation**: Despite the increase in operating cash flow, capex",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 2.045985924996785,
+        "usage": {
+          "prompt_tokens": 115,
+          "completion_tokens": 128,
+          "total_tokens": 243
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.8672656999551691,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Operating margin declined because despite revenue increasing by 18%, operating expenses also increased. Specifically, this increase was driven by higher cloud infrastructure costs and employee compensation. These additional expenses reduced the overall profitability relative to revenue, leading to a decrease in operating margin.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.8481599860097049,
+        "usage": {
+          "prompt_tokens": 122,
+          "completion_tokens": 52,
+          "total_tokens": 174
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.497099399974104,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The key risk mentioned in the update is the potential impact of foreign exchange pressures and rising infrastructure costs on profitability for the company's next quarter.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.4770712129975436,
+        "usage": {
+          "prompt_tokens": 114,
+          "completion_tokens": 29,
+          "total_tokens": 143
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.9091927999979816,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Operating margin declined because despite revenue increasing by 18%, operating expenses also increased. Specifically, this increase was driven by higher cloud infrastructure costs and employee compensation. The net effect of these increases led to a decrease in the ratio of operating income to total revenue, resulting in a lower operating margin.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.885657242994057,
+        "usage": {
+          "prompt_tokens": 122,
+          "completion_tokens": 60,
+          "total_tokens": 182
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.9585341000347398,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Investors should interpret this cash flow trend as follows:\n\n1. **Operating Cash Flow Improvement**: The operating cash flow has increased from one year to another, which indicates that companies are generating more revenue or reducing expenses effectively. This suggests positive business performance and operational efficiency.\n\n2. **Disciplined Working Capital Management**: The improvement in operating cash flow can be attributed to better collections (likely resulting from improved credit policies) and disciplined working capital management. This means that companies are efficiently managing their day-to-day operations and maintaining adequate liquidity without excessive borrowing.\n\n3. **Capital Expenditures**: Despite the increase in capital expenditures for infrastructure investments, these",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 1.953606237002532,
+        "usage": {
+          "prompt_tokens": 115,
+          "completion_tokens": 128,
+          "total_tokens": 243
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.7217533999937586,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The main business drivers of revenue growth mentioned in the context were:\n1. Stronger enterprise demand\n2. Higher renewal rates\n3. Increased adoption of premium products\nThese factors collectively led to revenue growth during the specified quarter.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.7019809650082607,
+        "usage": {
+          "prompt_tokens": 118,
+          "completion_tokens": 47,
+          "total_tokens": 165
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.2934127999469638,
+      "response": {
+        "task": "financial_qa",
+        "answer": "The key risk mentioned in the update is foreign exchange pressure and rising infrastructure costs.",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 0.2707425780099584,
+        "usage": {
+          "prompt_tokens": 114,
+          "completion_tokens": 17,
+          "total_tokens": 131
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.8129795000422746,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Investors should interpret this cash flow trend as follows:\n\n1. **Operating Cash Flow Improvement**: The operating cash flow has increased from one year to another, which indicates that companies have been able to generate more cash from their core business operations. This suggests efficiency in managing day-to-day activities and potentially higher profitability.\n\n2. **Disciplined Working Capital Management**: The improvement in operating cash flow can be attributed to better collections (improved efficiency in collecting receivables) and disciplined working capital management (effective control over expenses). These measures help reduce short-term liabilities while maintaining or improving long-term solvency.\n\n3. **Capital Expend",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 1.8087997900001938,
+        "usage": {
+          "prompt_tokens": 115,
+          "completion_tokens": 128,
+          "total_tokens": 243
+        }
+      },
+      "error": null
+    },
+    {
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 1.7374579000170343,
+      "response": {
+        "task": "financial_qa",
+        "answer": "Investors should interpret the cash flow trend as follows:\n\n1. **Operating Cash Flow Improvement**: The operating cash flow has increased from one year to another, which indicates that companies have been more efficient at generating cash from their core business operations. This suggests that the company's primary revenue streams are performing well or that cost-cutting measures have reduced expenses.\n\n2. **Disciplined Working Capital Management**: The improvement in operating cash flow can be attributed to better collections and disciplined working capital management. This means that the company is effectively managing its accounts receivable and inventory levels, reducing bad debts and excess stock, respectively, thereby improving liquidity and cash",
+        "model": "finance-qwen1.5b",
+        "latency_seconds": 1.7221614160080208,
+        "usage": {
+          "prompt_tokens": 115,
+          "completion_tokens": 128,
+          "total_tokens": 243
+        }
+      },
+      "error": null
+    }
+  ]
+}
