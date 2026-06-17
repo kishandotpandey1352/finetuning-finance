@@ -530,3 +530,17 @@ docker exec -it finance-ai-platform python src/inference/benchmark_quantization.
 --comparison report
 
 docker exec -it finance-ai-platform python src/inference/compare_quantization_reports.py --reports FP16=reports/quantization_fp16_day14.json INT8=reports/quantization_int8_day14.json INT4=reports/quantization_int4_day14.json --output reports/quantization_comparison_day14.md
+
+Day 15: Benchmarkign reports::
+
+Batch size / concurrency vs throughput
+Generation length vs latency
+INT4 vs FP16
+Memory vs latency
+Final inference recommendation
+
+command to run:
+
+docker exec -it finance-ai-platform python src/inference/create_inference_benchmark_report.py --latency-reports t64=reports/latency_day13_t64.json t128=reports/latency_day13_t128.json t256=reports/latency_day13_t256.json --throughput-reports c1=reports/throughput_day13_c1.json c2=reports/throughput_day13_c2.json c4=reports/throughput_day13_c4.json --quantization-reports FP16=reports/quantization_fp16_day14.json INT8=reports/quantization_int8_day14.json INT4=reports/quantization_int4_day14.json --output reports/inference_benchmark_report.md
+
+report is at : reports/inference_benchmark_report.md
