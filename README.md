@@ -592,3 +592,25 @@ http://localhost:9090
 
 Denerate traffic for the dashboard::
 python src/api/profile_api_performance.py --base-url http://localhost:8000 --num-requests 10 --concurrency 2 --output-json reports/api_performance_profile_day19.json --output-md reports/api_performance_profile_day19.md
+
+Day 20 - ENd to End test
+
+docker compose up -d finance-ai-platform vllm-server prometheus grafana
+
+Run end to end test: 
+
+python src/api/end_to_end_test.py --api-base-url http://localhost:8000 --vllm-base-url http://localhost:8001 --prometheus-url http://localhost:9090 --output-json reports/end_to_end_day20.json --output-md reports/end_to_end_day20.md
+
+
+Day 20 End-to-End Test
+================================================================================
+Overall status: PASSED
+PASS - fastapi_health
+PASS - fastapi_metrics
+PASS - vllm_models
+PASS - prometheus_ready
+PASS - summarize
+PASS - qa
+PASS - risk_analysis
+JSON report saved to: reports\end_to_end_day20.json
+Markdown report saved to: reports\end_to_end_day20.md

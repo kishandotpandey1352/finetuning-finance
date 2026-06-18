@@ -1,0 +1,86 @@
+{
+  "overall_status": "passed",
+  "api_base_url": "http://localhost:8000",
+  "vllm_base_url": "http://localhost:8001",
+  "prometheus_url": "http://localhost:9090",
+  "service_checks": [
+    {
+      "name": "fastapi_health",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.026696600019931793,
+      "error": null
+    },
+    {
+      "name": "fastapi_metrics",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.03895019995979965,
+      "error": null
+    },
+    {
+      "name": "vllm_models",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.02700369991362095,
+      "error": null
+    },
+    {
+      "name": "prometheus_ready",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.01866509998217225,
+      "error": null
+    }
+  ],
+  "endpoint_tests": [
+    {
+      "name": "summarize",
+      "endpoint": "/summarize",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.892364100087434,
+      "validation_message": "passed",
+      "model": "finance-qwen1.5b",
+      "usage": {
+        "prompt_tokens": 97,
+        "completion_tokens": 39,
+        "total_tokens": 136
+      },
+      "output_preview": "The company's revenue grew by 18% due to increased enterprise demand. Despite this, operating expenses surged with higher cloud infrastructure costs and employee compensation, leading to potential continued margin pressures.",
+      "error": null
+    },
+    {
+      "name": "qa",
+      "endpoint": "/qa",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 0.9947576000122353,
+      "validation_message": "passed",
+      "model": "finance-qwen1.5b",
+      "usage": {
+        "prompt_tokens": 119,
+        "completion_tokens": 52,
+        "total_tokens": 171
+      },
+      "output_preview": "Operating margin declined because despite an increase in revenue (due to stronger enterprise demand), there was also an increase in operating expenses (higher cloud infrastructure costs and employee compensation). This led to a decrease in profit relative to sales, resulting in a lower operating mar",
+      "error": null
+    },
+    {
+      "name": "risk_analysis",
+      "endpoint": "/risk-analysis",
+      "ok": true,
+      "status_code": 200,
+      "latency_seconds": 2.6552993999794126,
+      "validation_message": "passed",
+      "model": "finance-qwen1.5b",
+      "usage": {
+        "prompt_tokens": 157,
+        "completion_tokens": 192,
+        "total_tokens": 349
+      },
+      "output_preview": "1. **Key Risks**\n   - Revenue Risk: Increased revenue is not enough if it comes at the expense of declining margins.\n   - Margin Risk: Declining gross margin indicates reduced profitability per unit sold.\n   - Cash Flow Risk: Higher operating expenses could lead to cash flow pressures unless managed",
+      "error": null
+    }
+  ]
+}
