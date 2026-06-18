@@ -2,8 +2,15 @@ import os
 import time
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field
+
+from src.api.metrics import (
+    record_failure,
+    record_success,
+    update_gpu_metrics,
+)
 
 from src.api.vllm_client import (
     VLLMClientError,
@@ -80,16 +87,27 @@ def health():
         "training_model": os.getenv("MODEL_NAME"),
     }
 
+@app.get("/metrics")
+def metrics():
+    update_gpu_metrics()
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 @app.post("/summarize", response_model=SummarizeResponse)
 async def summarize(request: SummarizeRequest):
+    endpoint_name = "/summarize"
+
     system_prompt = (
         "You are a finance AI assistant. Summarize financial text clearly, "
         "concisely, and accurately. Focus on revenue, costs, profitability, "
         "cash flow, risks, and business drivers when relevant."
     )
 
-    user_prompt = f"""Summarize the following financial text: {request.text}"""
+    user_prompt = f"""Summarize the following financial text:
+
+{request.text}"""
 
     start = time.perf_counter()
 
@@ -107,9 +125,12 @@ async def summarize(request: SummarizeRequest):
         usage = extract_usage(response)
 
     except VLLMClientError as exc:
+        latency = time.perf_counter() - start
+        record_failure(endpoint_name, latency)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     latency = time.perf_counter() - start
+    record_success(endpoint_name, latency, usage)
 
     return SummarizeResponse(
         task="summarization",
@@ -119,8 +140,11 @@ async def summarize(request: SummarizeRequest):
         usage=usage,
     )
 
+
 @app.post("/qa", response_model=QAResponse)
 async def qa(request: QARequest):
+    endpoint_name = "/qa"
+
     system_prompt = (
         "You are a finance AI assistant. Answer financial questions clearly, "
         "accurately, and concisely. If context is provided, base your answer on it. "
@@ -131,13 +155,15 @@ async def qa(request: QARequest):
     if request.context:
         user_prompt = f"""Answer the financial question using the context below.
 
-        Context: {request.context}
+Context:
+{request.context}
 
-        Question: {request.question}
-            """
-
+Question:
+{request.question}"""
     else:
-        user_prompt = f"""Answer the following financial question: {request.question}"""
+        user_prompt = f"""Answer the following financial question:
+
+{request.question}"""
 
     start = time.perf_counter()
 
@@ -155,9 +181,12 @@ async def qa(request: QARequest):
         usage = extract_usage(response)
 
     except VLLMClientError as exc:
+        latency = time.perf_counter() - start
+        record_failure(endpoint_name, latency)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     latency = time.perf_counter() - start
+    record_success(endpoint_name, latency, usage)
 
     return QAResponse(
         task="financial_qa",
@@ -167,8 +196,11 @@ async def qa(request: QARequest):
         usage=usage,
     )
 
+
 @app.post("/risk-analysis", response_model=RiskAnalysisResponse)
 async def risk_analysis(request: RiskAnalysisRequest):
+    endpoint_name = "/risk-analysis"
+
     system_prompt = (
         "You are a finance risk analysis assistant. Analyze the provided financial text "
         "and identify key risks clearly and concisely. Focus on revenue risk, margin risk, "
@@ -202,9 +234,12 @@ Financial text:
         usage = extract_usage(response)
 
     except VLLMClientError as exc:
+        latency = time.perf_counter() - start
+        record_failure(endpoint_name, latency)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     latency = time.perf_counter() - start
+    record_success(endpoint_name, latency, usage)
 
     return RiskAnalysisResponse(
         task="risk_analysis",

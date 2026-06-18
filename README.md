@@ -584,3 +584,11 @@ python src/api/profile_api_performance.py --base-url http://localhost:8000 --num
 python src/api/profile_api_performance.py --base-url http://localhost:8000 --num-requests 10 --concurrency 2 --output-json reports/api_performance_profile_day18.json --output-md reports/api_performance_profile_day18.md
 
 python src/api/profile_api_performance.py --base-url http://localhost:8000 --num-requests 20 --concurrency 4 --output-json reports/api_performance_profile_day18_c4.json --output-md reports/api_performance_profile_day18_c4.md
+
+### Day 19: add prometheus and grafana
+docker compose up -d prometheus grafana
+
+http://localhost:9090
+
+Denerate traffic for the dashboard::
+python src/api/profile_api_performance.py --base-url http://localhost:8000 --num-requests 10 --concurrency 2 --output-json reports/api_performance_profile_day19.json --output-md reports/api_performance_profile_day19.md

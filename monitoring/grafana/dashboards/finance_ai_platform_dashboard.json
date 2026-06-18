@@ -1,0 +1,78 @@
+{
+  "id": null,
+  "uid": "finance-ai-platform",
+  "title": "Finance AI Platform",
+  "tags": ["finance-ai", "fastapi", "vllm"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Request Count by Endpoint",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (endpoint, status) (rate(finance_api_requests_total[1m]))",
+          "legendFormat": "{{endpoint}} - {{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Mean Latency by Endpoint",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (endpoint) (rate(finance_api_latency_seconds_sum[1m])) / sum by (endpoint) (rate(finance_api_latency_seconds_count[1m]))",
+          "legendFormat": "{{endpoint}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "P95 Latency by Endpoint",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, endpoint) (rate(finance_api_latency_seconds_bucket[1m])))",
+          "legendFormat": "{{endpoint}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tokens/sec by Endpoint",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "finance_api_tokens_per_second",
+          "legendFormat": "{{endpoint}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "GPU Utilization %",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "finance_gpu_utilization_percent",
+          "legendFormat": "GPU utilization"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "GPU Memory Used MB",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "finance_gpu_memory_used_mb",
+          "legendFormat": "GPU memory used"
+        }
+      ]
+    }
+  ]
+}
