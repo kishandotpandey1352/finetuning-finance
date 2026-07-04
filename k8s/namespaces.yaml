@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: finance-ai
+  labels:
+    name: finance-ai
+    app.kubernetes.io/name: finance-ai
+    app.kubernetes.io/part-of: finance-llm-platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nvidia
+  labels:
+    name: nvidia
+    app.kubernetes.io/name: nvidia
+    app.kubernetes.io/part-of: finance-llm-platform
