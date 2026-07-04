@@ -9,3 +9,22 @@ outputs/
 mlruns/
 *.pt
 *.safetensors
+
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# AWS / secrets
+.env
+.env.*
+*.pem
+*.key
