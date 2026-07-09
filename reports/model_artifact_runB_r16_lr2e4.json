@@ -1,0 +1,41 @@
+{
+  "artifact_name": "qLoRA-finance-runB-r16-lr2e4",
+  "model_family": "Qwen2.5",
+  "base_model": "Qwen/Qwen2.5-3B-Instruct",
+  "fine_tuning_method": "QLoRA",
+  "adapter_type": "PEFT LoRA",
+  "task_type": "CAUSAL_LM",
+  "local_adapter_path": "outputs/qLoRA-finance-runB-r16-lr2e4",
+  "selected_for_deployment": true,
+  "selection_reason": "Best evaluation run based on BERTScore F1 and ROUGE-L among available fine-tuned runs.",
+  "evaluation_summary": {
+    "run_name": "RunB-r16-lr2e4",
+    "bertscore_f1": 0.9237,
+    "rouge_l": 0.3940,
+    "empty_predictions": 0
+  },
+  "required_files": [
+    "adapter_config.json",
+    "adapter_model.safetensors",
+    "tokenizer_config.json",
+    "tokenizer.json",
+    "chat_template.jinja",
+    "README.md"
+  ],
+  "planned_s3_layout": {
+    "bucket": "<to-be-created-or-terraform-output>",
+    "prefix": "models/qwen2.5-3b-finance/runB-r16-lr2e4/adapter/"
+  },
+  "deployment_notes": [
+    "This is an adapter-only artifact, not a full merged model.",
+    "Inference must load the base model first, then attach this adapter.",
+    "The adapter must not be loaded with Qwen2.5-1.5B or any other base model.",
+    "The planned inference service will expose secure FastAPI endpoints backed by this adapter."
+  ],
+  "milestone_status": {
+    "milestone": "Milestone 3",
+    "status": "completed locally",
+    "runtime_cloud_dependency": "none",
+    "next_step": "Upload adapter artifact to S3"
+  }
+}
