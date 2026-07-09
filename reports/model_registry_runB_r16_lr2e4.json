@@ -1,0 +1,49 @@
+{
+  "registry_version": "1.0",
+  "model_id": "qwen2.5-3b-finance-runB-r16-lr2e4",
+  "model_name": "qwen2.5-3b-finance",
+  "run_id": "runB-r16-lr2e4",
+  "artifact_type": "peft_lora_adapter",
+  "base_model": "Qwen/Qwen2.5-3B-Instruct",
+  "adapter_local_path": "outputs/qLoRA-finance-runB-r16-lr2e4",
+  "s3_bucket": "finance-llm-local-artifacts-671607590681-us-east-1",
+  "s3_prefix": "models/qwen2.5-3b-finance/runB-r16-lr2e4/adapter/",
+  "s3_uri": "s3://finance-llm-local-artifacts-671607590681-us-east-1/models/qwen2.5-3b-finance/runB-r16-lr2e4/adapter/",
+  "deployment_status": "registered_in_s3",
+  "selected_for_inference": true,
+  "fine_tuning": {
+    "method": "QLoRA",
+    "lora_rank": 16,
+    "lora_alpha": 32,
+    "task_type": "CAUSAL_LM"
+  },
+  "evaluation": {
+    "selection_reason": "Best available fine-tuned run by BERTScore F1 and ROUGE-L.",
+    "bertscore_f1": 0.9237,
+    "rouge_l": 0.394,
+    "empty_predictions": 0
+  },
+  "required_files": [
+    "adapter_config.json",
+    "adapter_model.safetensors",
+    "tokenizer_config.json",
+    "tokenizer.json",
+    "chat_template.jinja",
+    "README.md"
+  ],
+  "inference_requirements": {
+    "load_base_model_first": true,
+    "base_model_must_match_adapter": true,
+    "recommended_base_model": "Qwen/Qwen2.5-3B-Instruct",
+    "do_not_use_with": [
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "Qwen/Qwen2.5-7B-Instruct",
+      "meta-llama/Meta-Llama-3-8B-Instruct"
+    ]
+  },
+  "milestone": {
+    "name": "Milestone 4",
+    "description": "Upload validated adapter artifact to S3 and register model artifact metadata.",
+    "status": "completed_after_upload_and_verification"
+  }
+}
