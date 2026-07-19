@@ -1,0 +1,64 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: finance-llm-api
+  namespace: finance-ai
+  labels:
+    app.kubernetes.io/name: finance-llm-api
+    app.kubernetes.io/part-of: finance-llm-platform
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/load-balancer-name: finance-llm-api-dev
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/success-codes: "200"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: finance-llm-api
+                port:
+                  number: 80
+          - path: /ready
+            pathType: Prefix
+            backend:
+              service:
+                name: finance-llm-api
+                port:
+                  number: 80
+          - path: /summarize
+            pathType: Prefix
+            backend:
+              service:
+                name: finance-llm-api
+                port:
+                  number: 80
+          - path: /qa
+            pathType: Prefix
+            backend:
+              service:
+                name: finance-llm-api
+                port:
+                  number: 80
+          - path: /risk-analysis
+            pathType: Prefix
+            backend:
+              service:
+                name: finance-llm-api
+                port:
+                  number: 80
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: finance-llm-api
+                port:
+                  number: 80
