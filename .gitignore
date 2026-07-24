@@ -141,3 +141,5 @@ Thumbs.db
 *.csv
 *.jsonl
 *.txt
+# AWS cleanup temporary files
+untagged-images.json
