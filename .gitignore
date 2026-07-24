@@ -9,3 +9,12 @@ outputs/
 mlruns/
 *.pt
 *.safetensors
+
+# Terraform local files
+.terraform/
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+crash.*.log
