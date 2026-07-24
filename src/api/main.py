@@ -1,250 +1,144 @@
-import os
-import time
-from typing import Optional
-
-from fastapi import FastAPI, HTTPException, Response
+﻿from fastapi import FastAPI, Depends
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from pydantic import BaseModel, Field
+from starlette.responses import Response
 
+from src.api.auth import verify_api_key
 from src.api.metrics import (
-    record_failure,
-    record_success,
-    update_gpu_metrics,
+    INFERENCE_REQUESTS_TOTAL,
+    INFERENCE_LATENCY_SECONDS,
 )
-
-from src.api.vllm_client import (
-    VLLMClientError,
-    extract_text,
-    extract_usage,
-    generate_chat_completion,
+from src.api.schemas import (
+    SummarizeRequest,
+    QARequest,
+    RiskAnalysisRequest,
+    InferenceResponse,
 )
+from src.inference.loader import get_finance_llm
 
 
-app = FastAPI(title=os.getenv("APP_NAME", "finance-ai-platform"))
-
-
-class SummarizeRequest(BaseModel):
-    text: str = Field(..., min_length=10)
-    max_tokens: int = Field(default=256, ge=32, le=1024)
-    temperature: float = Field(default=0.2, ge=0.0, le=1.0)
-
-
-class ModelUsage(BaseModel):
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-
-
-class SummarizeResponse(BaseModel):
-    task: str
-    summary: str
-    model: str
-    latency_seconds: float
-    usage: ModelUsage
-
-class QARequest(BaseModel):
-    question: str = Field(..., min_length=5)
-    context: Optional[str] = Field(default=None)
-    max_tokens: int = Field(default=256, ge=32, le=1024)
-    temperature: float = Field(default=0.2, ge=0.0, le=1.0)
-
-
-class QAResponse(BaseModel):
-    task: str
-    answer: str
-    model: str
-    latency_seconds: float
-    usage: ModelUsage
-
-class RiskAnalysisRequest(BaseModel):
-    text: str = Field(..., min_length=10)
-    max_tokens: int = Field(default=256, ge=32, le=1024)
-    temperature: float = Field(default=0.2, ge=0.0, le=1.0)
-
-
-class RiskAnalysisResponse(BaseModel):
-    task: str
-    risk_analysis: str
-    model: str
-    latency_seconds: float
-    usage: ModelUsage
-
-@app.get("/")
-def root():
-    return {
-        "message": "Finance AI Platform API",
-        "status": "running",
-    }
+app = FastAPI(
+    title="Finance LLM Inference API",
+    version="0.1.0",
+    description="Secure FastAPI service for finance-domain LLM inference.",
+)
 
 
 @app.get("/health")
 def health():
+    model = get_finance_llm()
     return {
         "status": "ok",
-        "app": os.getenv("APP_NAME"),
-        "serving_model": os.getenv("VLLM_MODEL_NAME", "finance-qwen1.5b"),
-        "vllm_base_url": os.getenv("VLLM_BASE_URL"),
-        "training_model": os.getenv("MODEL_NAME"),
+        "service": "finance-llm-inference-api",
+        "model_id": model.model_id,
     }
+
+
+@app.get("/ready")
+def ready():
+    model = get_finance_llm()
+    return {
+        "ready": model.model_loaded and model.adapter_loaded,
+        "model_loaded": model.model_loaded,
+        "adapter_loaded": model.adapter_loaded,
+        "model_id": model.model_id,
+    }
+
+
+@app.post("/summarize", response_model=InferenceResponse)
+def summarize(
+    request: SummarizeRequest,
+    _: None = Depends(verify_api_key),
+):
+    route = "summarize"
+
+    with INFERENCE_LATENCY_SECONDS.labels(route=route).time():
+        try:
+            model = get_finance_llm()
+            prompt = (
+                "Summarize the following financial text clearly and concisely.\n\n"
+                f"Text:\n{request.text}\n\nSummary:"
+            )
+            output = model.generate(
+                prompt=prompt,
+                max_new_tokens=request.max_new_tokens,
+                temperature=request.temperature,
+            )
+
+            INFERENCE_REQUESTS_TOTAL.labels(route=route, status="success").inc()
+
+            return InferenceResponse(
+                model_id=model.model_id,
+                output=output,
+            )
+        except Exception as exc:
+            INFERENCE_REQUESTS_TOTAL.labels(route=route, status="error").inc()
+            raise RuntimeError(f"Summarization failed: {exc}") from exc
+
+
+@app.post("/qa", response_model=InferenceResponse)
+def qa(
+    request: QARequest,
+    _: None = Depends(verify_api_key),
+):
+    route = "qa"
+
+    with INFERENCE_LATENCY_SECONDS.labels(route=route).time():
+        try:
+            model = get_finance_llm()
+            prompt = (
+                "Answer the financial question using only the provided context.\n\n"
+                f"Context:\n{request.context}\n\n"
+                f"Question:\n{request.question}\n\nAnswer:"
+            )
+            output = model.generate(
+                prompt=prompt,
+                max_new_tokens=request.max_new_tokens,
+                temperature=request.temperature,
+            )
+
+            INFERENCE_REQUESTS_TOTAL.labels(route=route, status="success").inc()
+
+            return InferenceResponse(
+                model_id=model.model_id,
+                output=output,
+            )
+        except Exception as exc:
+            INFERENCE_REQUESTS_TOTAL.labels(route=route, status="error").inc()
+            raise RuntimeError(f"QA failed: {exc}") from exc
+
+
+@app.post("/risk-analysis", response_model=InferenceResponse)
+def risk_analysis(
+    request: RiskAnalysisRequest,
+    _: None = Depends(verify_api_key),
+):
+    route = "risk-analysis"
+
+    with INFERENCE_LATENCY_SECONDS.labels(route=route).time():
+        try:
+            model = get_finance_llm()
+            prompt = (
+                "Identify the key financial risks in the following text. "
+                "Return a concise risk analysis.\n\n"
+                f"Text:\n{request.text}\n\nRisk analysis:"
+            )
+            output = model.generate(
+                prompt=prompt,
+                max_new_tokens=request.max_new_tokens,
+                temperature=request.temperature,
+            )
+
+            INFERENCE_REQUESTS_TOTAL.labels(route=route, status="success").inc()
+
+            return InferenceResponse(
+                model_id=model.model_id,
+                output=output,
+            )
+        except Exception as exc:
+            INFERENCE_REQUESTS_TOTAL.labels(route=route, status="error").inc()
+            raise RuntimeError(f"Risk analysis failed: {exc}") from exc
+
 
 @app.get("/metrics")
 def metrics():
-    update_gpu_metrics()
-    return Response(
-        content=generate_latest(),
-        media_type=CONTENT_TYPE_LATEST,
-    )
-
-@app.post("/summarize", response_model=SummarizeResponse)
-async def summarize(request: SummarizeRequest):
-    endpoint_name = "/summarize"
-
-    system_prompt = (
-        "You are a finance AI assistant. Summarize financial text clearly, "
-        "concisely, and accurately. Focus on revenue, costs, profitability, "
-        "cash flow, risks, and business drivers when relevant."
-    )
-
-    user_prompt = f"""Summarize the following financial text:
-
-{request.text}"""
-
-    start = time.perf_counter()
-
-    try:
-        response = await generate_chat_completion(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
-        )
-
-        summary = extract_text(response)
-        usage = extract_usage(response)
-
-    except VLLMClientError as exc:
-        latency = time.perf_counter() - start
-        record_failure(endpoint_name, latency)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    latency = time.perf_counter() - start
-    record_success(endpoint_name, latency, usage)
-
-    return SummarizeResponse(
-        task="summarization",
-        summary=summary,
-        model=os.getenv("VLLM_MODEL_NAME", "finance-qwen1.5b"),
-        latency_seconds=latency,
-        usage=usage,
-    )
-
-
-@app.post("/qa", response_model=QAResponse)
-async def qa(request: QARequest):
-    endpoint_name = "/qa"
-
-    system_prompt = (
-        "You are a finance AI assistant. Answer financial questions clearly, "
-        "accurately, and concisely. If context is provided, base your answer on it. "
-        "If the answer is not available in the context, say that the provided context "
-        "does not contain enough information."
-    )
-
-    if request.context:
-        user_prompt = f"""Answer the financial question using the context below.
-
-Context:
-{request.context}
-
-Question:
-{request.question}"""
-    else:
-        user_prompt = f"""Answer the following financial question:
-
-{request.question}"""
-
-    start = time.perf_counter()
-
-    try:
-        response = await generate_chat_completion(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
-        )
-
-        answer = extract_text(response)
-        usage = extract_usage(response)
-
-    except VLLMClientError as exc:
-        latency = time.perf_counter() - start
-        record_failure(endpoint_name, latency)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    latency = time.perf_counter() - start
-    record_success(endpoint_name, latency, usage)
-
-    return QAResponse(
-        task="financial_qa",
-        answer=answer,
-        model=os.getenv("VLLM_MODEL_NAME", "finance-qwen1.5b"),
-        latency_seconds=latency,
-        usage=usage,
-    )
-
-
-@app.post("/risk-analysis", response_model=RiskAnalysisResponse)
-async def risk_analysis(request: RiskAnalysisRequest):
-    endpoint_name = "/risk-analysis"
-
-    system_prompt = (
-        "You are a finance risk analysis assistant. Analyze the provided financial text "
-        "and identify key risks clearly and concisely. Focus on revenue risk, margin risk, "
-        "cash flow risk, cost pressure, debt risk, liquidity risk, market risk, and "
-        "operational risk when relevant."
-    )
-
-    user_prompt = f"""Analyze the financial risks in the following text.
-
-Return the answer in this structure:
-1. Key risks
-2. Why they matter
-3. Overall risk level: Low, Medium, or High
-
-Financial text:
-{request.text}"""
-
-    start = time.perf_counter()
-
-    try:
-        response = await generate_chat_completion(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
-        )
-
-        analysis = extract_text(response)
-        usage = extract_usage(response)
-
-    except VLLMClientError as exc:
-        latency = time.perf_counter() - start
-        record_failure(endpoint_name, latency)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    latency = time.perf_counter() - start
-    record_success(endpoint_name, latency, usage)
-
-    return RiskAnalysisResponse(
-        task="risk_analysis",
-        risk_analysis=analysis,
-        model=os.getenv("VLLM_MODEL_NAME", "finance-qwen1.5b"),
-        latency_seconds=latency,
-        usage=usage,
-    )
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
