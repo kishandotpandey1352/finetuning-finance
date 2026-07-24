@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListFinanceAdapterPrefix",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::finance-llm-local-artifacts-671607590681-us-east-1",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "models/qwen2.5-3b-finance/runB-r16-lr2e4/adapter",
+            "models/qwen2.5-3b-finance/runB-r16-lr2e4/adapter/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ReadFinanceAdapterObjects",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::finance-llm-local-artifacts-671607590681-us-east-1/models/qwen2.5-3b-finance/runB-r16-lr2e4/adapter/*"
+    }
+  ]
+}
