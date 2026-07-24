@@ -28,3 +28,8 @@ override.tf.json
 .env.*
 *.pem
 *.key
+
+# run pod
+
+.env.runpod
+.env.runpod.local

@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: finance-llm-api
+  namespace: finance-ai
+  labels:
+    app.kubernetes.io/name: finance-llm-api
+    app.kubernetes.io/part-of: finance-llm-platform
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: finance-llm-api
+  namespaceSelector:
+    matchNames:
+      - finance-ai
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

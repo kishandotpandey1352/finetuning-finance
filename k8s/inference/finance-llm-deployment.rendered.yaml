@@ -20,14 +20,14 @@ spec:
       serviceAccountName: finance-inference-sa
       containers:
         - name: finance-llm-api
-          image: IMAGE_URI_PLACEHOLDER
+          image: 671607590681.dkr.ecr.us-east-1.amazonaws.com/finance-llm-platform-inference:v1
           imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8000
           env:
             - name: USE_MOCK_MODEL
-              value: "USE_MOCK_MODEL_PLACEHOLDER"
+              value: "true"
             - name: BASE_MODEL_NAME
               value: "Qwen/Qwen2.5-3B-Instruct"
             - name: ADAPTER_S3_URI

@@ -1,0 +1,73 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: llama3-finance-weekly-finetune
+  namespace: finance-ai
+  labels:
+    app.kubernetes.io/name: llama3-finance-weekly-finetune
+    app.kubernetes.io/part-of: finance-llm-platform
+spec:
+  schedule: "0 2 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  suspend: true
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: llama3-finance-weekly-finetune
+            app.kubernetes.io/part-of: finance-llm-platform
+        spec:
+          serviceAccountName: finance-training-sa
+          restartPolicy: Never
+          tolerations:
+            - key: "nvidia.com/gpu"
+              operator: "Exists"
+              effect: "NoSchedule"
+          nodeSelector:
+            accelerator: nvidia
+          containers:
+            - name: trainer
+              image: 671607590681.dkr.ecr.us-east-1.amazonaws.com/finance-llm-platform-dev-training:v1
+              imagePullPolicy: Always
+              env:
+                - name: RUN_ID
+                  value: "scheduled"
+                - name: BASE_MODEL_NAME
+                  value: "meta-llama/Meta-Llama-3-8B-Instruct"
+                - name: TRAIN_DATASET_S3_URI
+                  value: "s3://finance-llm-platform-dev-artifacts-671607590681-us-east-1/datasets/finance_gold_train.jsonl"
+                - name: EVAL_DATASET_S3_URI
+                  value: "s3://finance-llm-platform-dev-artifacts-671607590681-us-east-1/datasets/finance_gold_test.jsonl"
+                - name: OUTPUT_S3_URI
+                  value: "s3://finance-llm-platform-dev-artifacts-671607590681-us-east-1/models/llama3-finance/scheduled/"
+                - name: HF_TOKEN_SECRET_ID
+                  value: "finance-llm-platform-dev/hf-token"
+                - name: MAX_SEQ_LENGTH
+                  value: "1024"
+                - name: NUM_TRAIN_EPOCHS
+                  value: "1"
+                - name: PER_DEVICE_TRAIN_BATCH_SIZE
+                  value: "1"
+                - name: GRADIENT_ACCUMULATION_STEPS
+                  value: "8"
+                - name: LEARNING_RATE
+                  value: "2e-4"
+                - name: LORA_R
+                  value: "16"
+                - name: LORA_ALPHA
+                  value: "32"
+                - name: LORA_DROPOUT
+                  value: "0.05"
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: "16Gi"
+                  nvidia.com/gpu: 1
+                limits:
+                  cpu: "4"
+                  memory: "24Gi"
+                  nvidia.com/gpu: 1

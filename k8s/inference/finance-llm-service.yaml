@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: finance-llm-api
+  namespace: finance-ai
+  labels:
+    app.kubernetes.io/name: finance-llm-api
+    app.kubernetes.io/part-of: finance-llm-platform
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: finance-llm-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
