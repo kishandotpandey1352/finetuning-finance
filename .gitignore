@@ -138,3 +138,6 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+*.csv
+*.jsonl
+*.txt
