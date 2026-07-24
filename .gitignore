@@ -1,30 +1,140 @@
+﻿# =========================
+# Python
+# =========================
 __pycache__/
-.env
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
 .venv/
-data/raw/
-data/cleaned/
-data/instruction/
-models/
-outputs/
-mlruns/
-*.pt
-*.safetensors
+venv/
+env/
+ENV/
 
+# Jupyter / notebooks checkpoints
+.ipynb_checkpoints/
 
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-crash.log
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-.terraform.lock.hcl
-
-# AWS / secrets
+# =========================
+# Secrets / env files
+# =========================
 .env
 .env.*
+!.env.example
+!.env.*.example
 *.pem
 *.key
+*.crt
+*.p12
+*.pfx
+*.secret
+secrets/
+credentials/
+token.json
+
+# Project-specific sensitive envs
+.env.local
+.env.runpod
+.env.runpod.example
+
+# AWS credentials / local config
+.aws/
+aws/
+awscliv2.zip
+
+# =========================
+# Terraform
+# =========================
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+terraform.tfvars
+terraform.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+.terraform.tfstate.lock.info
+
+# Usually commit this only if you intentionally want provider lock reproducibility.
+# For now ignore it to avoid accidental noisy infra commits.
+.terraform.lock.hcl
+
+# =========================
+# Docker / build outputs
+# =========================
+*.tar
+*.img
+
+# =========================
+# ML artifacts / model outputs
+# =========================
+outputs/
+checkpoints/
+models/
+adapters/
+runs/
+wandb/
+mlruns/
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.ckpt
+*.onnx
+*.gguf
+*.pkl
+*.joblib
+
+# Hugging Face / cache
+.cache/
+hf-cache/
+.huggingface/
+transformers_cache/
+
+# =========================
+# Node / Next.js frontend
+# =========================
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/build/
+frontend/.turbo/
+frontend/.vercel/
+frontend/coverage/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# Local frontend envs
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+!frontend/.env.*.example
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# OS / editor
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
