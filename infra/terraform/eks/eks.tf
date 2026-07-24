@@ -1,16 +1,19 @@
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.31"
+  version = "~> 20.0"
 
-  cluster_name    = "${local.name_prefix}-eks"
+  cluster_name    = local.cluster_name
   cluster_version = var.cluster_version
-
-  cluster_endpoint_public_access = true
-
-  enable_cluster_creator_admin_permissions = true
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
+
+  enable_irsa = true
+
+  enable_cluster_creator_admin_permissions = true
+
+  cluster_endpoint_public_access  = true
+  cluster_endpoint_private_access = true
 
   cluster_addons = {
     coredns                = {}
@@ -46,6 +49,19 @@ module "eks" {
       iam_role_use_name_prefix = false
 
       instance_types = var.gpu_node_instance_types
+
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+
+          ebs = {
+            volume_size           = 100
+            volume_type           = "gp3"
+            encrypted             = true
+            delete_on_termination = true
+          }
+        }
+      }
 
       min_size     = var.gpu_node_min_size
       max_size     = var.gpu_node_max_size
