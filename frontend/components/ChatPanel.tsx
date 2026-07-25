@@ -78,15 +78,28 @@ export function ChatPanel({ auth, mode, task, provider, onModeChange, onTaskChan
   return (
     <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
       <div className="space-y-5 rounded-[32px] border border-white/10 bg-panel/85 p-6 shadow-halo backdrop-blur-xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/70">Chat workspace</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">{mode === "premium" ? "Premium route" : "Basic route"}</h2>
-          </div>
-          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs tracking-[0.18em] text-slate-300">
-            {provider.provider} · {provider.name}
-          </div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/70">
+            Chat Workspace
+          </p>
+          <h2 className="mt-2 text-3xl font-semibold text-white">
+            Run the selected finance workflow
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+            This request will use the mode, task type, and provider selected in the Workflow tab.
+          </p>
         </div>
+
+        <div className="rounded-3xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-sm text-cyan-100">
+          <p className="text-xs uppercase tracking-[0.22em] text-cyan-200/70">
+            Current workflow
+          </p>
+          <p className="mt-1 font-semibold capitalize">
+            {mode} · {task} · {provider.name}
+          </p>
+        </div>
+      </div>
 
         <label className="block space-y-2">
           <span className="text-sm font-medium text-slate-200">Prompt</span>

@@ -6,8 +6,13 @@ import type {
   UsageMetadata,
 } from "@/types";
 
-const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const USE_MOCK_BACKEND = (process.env.NEXT_PUBLIC_USE_MOCK_BACKEND ?? "true").toLowerCase() === "true";
+const USE_MOCK_BACKEND =
+  (process.env.NEXT_PUBLIC_USE_MOCK_BACKEND ?? "true").toLowerCase() === "true";
+
+type LiveInferenceResponse = {
+  model_id: string;
+  output: string;
+};
 
 function now() {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -17,21 +22,44 @@ function toTokenCount(text: string) {
   return Math.max(1, Math.round(text.trim().split(/\s+/).filter(Boolean).length * 1.2));
 }
 
-function requestUrl(path: string) {
-  return `${DEFAULT_API_BASE_URL.replace(/\/$/, "")}${path}`;
-}
-
-function requestHeaders(accessToken?: string) {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (accessToken?.trim()) {
-    headers["X-API-Key"] = accessToken.trim();
-    headers.Authorization = `Bearer ${accessToken.trim()}`;
+function getTaskEndpoint(task: ChatRequestInput["task"]) {
+  if (task === "summarize") {
+    return "/api/backend/summarize";
   }
 
-  return headers;
+  if (task === "qa") {
+    return "/api/backend/qa";
+  }
+
+  return "/api/backend/risk-analysis";
+}
+
+function buildRequestBody(input: ChatRequestInput) {
+  const maxNewTokens = input.maxNewTokens ?? input.provider.defaultMaxNewTokens;
+  const temperature = input.temperature ?? input.provider.defaultTemperature;
+
+  if (input.task === "summarize") {
+    return {
+      text: input.prompt,
+      max_new_tokens: maxNewTokens,
+      temperature,
+    };
+  }
+
+  if (input.task === "qa") {
+    return {
+      question: input.prompt,
+      context: input.context ?? "",
+      max_new_tokens: maxNewTokens,
+      temperature,
+    };
+  }
+
+  return {
+    text: input.prompt,
+    max_new_tokens: maxNewTokens,
+    temperature,
+  };
 }
 
 function buildUsage(params: {
@@ -109,131 +137,70 @@ function mockResponse(input: ChatRequestInput, variant = 0): FinanceResponse {
   };
 }
 
-async function postJson<T>(path: string, body: unknown, accessToken?: string): Promise<T> {
+async function postInference(input: ChatRequestInput): Promise<LiveInferenceResponse> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 15000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 10 * 60 * 1000);
 
   try {
-    const response = await fetch(requestUrl(path), {
+    const response = await fetch(getTaskEndpoint(input.task), {
       method: "POST",
-      headers: requestHeaders(accessToken),
-      body: JSON.stringify(body),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(buildRequestBody(input)),
       signal: controller.signal,
       cache: "no-store",
     });
 
+    const text = await response.text();
+
     if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
+      throw new Error(text || `Request failed with status ${response.status}`);
     }
 
-    return (await response.json()) as T;
+    return JSON.parse(text) as LiveInferenceResponse;
   } finally {
-    window.clearTimeout(timeout);
+    window.clearTimeout(timeoutId);
   }
 }
 
 export async function sendFinancePrompt(input: ChatRequestInput): Promise<FinanceResponse> {
-  if (USE_MOCK_BACKEND || !input.accessToken) {
+  if (USE_MOCK_BACKEND) {
     return mockResponse(input);
   }
 
   const startedAt = now();
+  const payload = await postInference(input);
+  const output = payload.output;
+  const modelId = payload.model_id ?? input.provider.modelId;
 
-  try {
-    if (input.task === "summarize") {
-      const payload = await postJson<{ summary: string; model_id: string }>("/summarize", {
-        text: input.prompt,
-        max_new_tokens: input.maxNewTokens ?? input.provider.defaultMaxNewTokens,
-        temperature: input.temperature ?? input.provider.defaultTemperature,
-      }, input.accessToken);
-
-      const output = payload.summary;
-
-      return {
-        id: `live-${Date.now()}`,
-        prompt: input.prompt,
-        title: titleFromPrompt(input.prompt, "Summary"),
-        output,
-        provider: input.provider.provider,
-        modelId: payload.model_id ?? input.provider.modelId,
-        task: input.task,
-        mode: input.mode,
-        createdAt: new Date().toISOString(),
-        usage: buildUsage({
-          provider: input.provider.provider,
-          modelId: payload.model_id ?? input.provider.modelId,
-          task: input.task,
-          prompt: input.prompt,
-          output,
-          latencyMs: now() - startedAt,
-          source: "live",
-        }),
-      };
-    }
-
-    if (input.task === "qa") {
-      const payload = await postJson<{ answer: string; model_id: string }>("/qa", {
-        question: input.prompt,
-        context: input.context,
-        max_new_tokens: input.maxNewTokens ?? input.provider.defaultMaxNewTokens,
-        temperature: input.temperature ?? input.provider.defaultTemperature,
-      }, input.accessToken);
-
-      const output = payload.answer;
-
-      return {
-        id: `live-${Date.now()}`,
-        prompt: input.prompt,
-        title: titleFromPrompt(input.prompt, "Answer"),
-        output,
-        provider: input.provider.provider,
-        modelId: payload.model_id ?? input.provider.modelId,
-        task: input.task,
-        mode: input.mode,
-        createdAt: new Date().toISOString(),
-        usage: buildUsage({
-          provider: input.provider.provider,
-          modelId: payload.model_id ?? input.provider.modelId,
-          task: input.task,
-          prompt: `${input.context ?? ""}\n${input.prompt}`,
-          output,
-          latencyMs: now() - startedAt,
-          source: "live",
-        }),
-      };
-    }
-
-    const payload = await postJson<{ risk_analysis: string; model_id: string }>("/risk-analysis", {
-      text: input.prompt,
-      max_new_tokens: input.maxNewTokens ?? input.provider.defaultMaxNewTokens,
-      temperature: input.temperature ?? input.provider.defaultTemperature,
-    }, input.accessToken);
-
-    const output = payload.risk_analysis;
-
-    return {
-      id: `live-${Date.now()}`,
-      prompt: input.prompt,
-      title: titleFromPrompt(input.prompt, "Risk analysis"),
-      output,
+  return {
+    id: `live-${Date.now()}`,
+    prompt: input.prompt,
+    title: titleFromPrompt(
+      input.prompt,
+      input.task === "summarize"
+        ? "Summary"
+        : input.task === "qa"
+          ? "Answer"
+          : "Risk analysis",
+    ),
+    output,
+    provider: input.provider.provider,
+    modelId,
+    task: input.task,
+    mode: input.mode,
+    createdAt: new Date().toISOString(),
+    usage: buildUsage({
       provider: input.provider.provider,
-      modelId: payload.model_id ?? input.provider.modelId,
+      modelId,
       task: input.task,
-      mode: input.mode,
-      createdAt: new Date().toISOString(),
-      usage: buildUsage({
-        provider: input.provider.provider,
-        modelId: payload.model_id ?? input.provider.modelId,
-        task: input.task,
-        prompt: input.prompt,
-        output,
-        latencyMs: now() - startedAt,
-        source: "live",
-      }),
-    };
-  } catch {
-    return mockResponse(input);
-  }
+      prompt: input.task === "qa" ? `${input.context ?? ""}\n${input.prompt}` : input.prompt,
+      output,
+      latencyMs: now() - startedAt,
+      source: "live",
+    }),
+  };
 }
 
 export async function runComparison(input: ComparisonRequestInput): Promise<ComparisonResult> {

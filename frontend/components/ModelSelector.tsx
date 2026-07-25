@@ -36,7 +36,12 @@ export function ModelSelector({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/70">Workflow</p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">Choose the mode and provider</h2>
+          <h2 className="mt-2 text-3xl font-semibold text-white">
+            Choose the mode, task, and provider
+          </h2>    
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+            Select the operating mode, finance task type, and provider route before running the configured request in Chat Workspace.
+          </p>    
         </div>
         <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs tracking-[0.18em] text-slate-300">
           {activeProvider.name}
