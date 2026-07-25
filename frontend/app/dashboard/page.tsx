@@ -187,7 +187,7 @@ export default function DashboardPage() {
   const hasApiKey = Boolean(auth?.accessToken || defaultApiKey);
   const backendConnected = health?.status === "ok";
   const modelId = ready?.model_id ?? health?.model_id ?? provider.modelId;
-  const lastUsage = savedEntry?.response?.usage;
+  const lastUsage = savedEntry?.usage;
 
   return (
     <main className="page-shell">
@@ -349,7 +349,7 @@ export default function DashboardPage() {
                           )
                         }
                       />
-                      <InfoRow label="Last task" value={savedEntry?.response?.task ?? "None yet"} />
+                      <InfoRow label="Last task" value={savedEntry?.task ?? "None yet"} />
                       <InfoRow
                         label="Latency/tokens"
                         value={

@@ -37,10 +37,13 @@ function getTaskEndpoint(task: ChatRequestInput["task"]) {
 function buildRequestBody(input: ChatRequestInput) {
   const maxNewTokens = input.maxNewTokens ?? input.provider.defaultMaxNewTokens;
   const temperature = input.temperature ?? input.provider.defaultTemperature;
+  const context = input.context?.trim();
 
   if (input.task === "summarize") {
     return {
-      text: input.prompt,
+      text: context
+        ? `${input.prompt}\n\nInstructions:\n${context}`
+        : input.prompt,
       max_new_tokens: maxNewTokens,
       temperature,
     };
@@ -49,14 +52,16 @@ function buildRequestBody(input: ChatRequestInput) {
   if (input.task === "qa") {
     return {
       question: input.prompt,
-      context: input.context ?? "",
+      context: context ?? "",
       max_new_tokens: maxNewTokens,
       temperature,
     };
   }
 
   return {
-    text: input.prompt,
+    text: context
+      ? `${input.prompt}\n\nRisk focus:\n${context}`
+      : input.prompt,
     max_new_tokens: maxNewTokens,
     temperature,
   };
