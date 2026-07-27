@@ -79,7 +79,7 @@ export function Sidebar({ displayName, mode, onLogout }: SidebarProps) {
     <div className="flex flex-col gap-5">
       <div>
         <p className="text-xs uppercase tracking-[0.32em] text-cyan-200/70">
-          Finance LLM Studio
+          LLM Studio
         </p>
         <h2 className="mt-3 text-2xl font-semibold text-white">
           {displayName}

@@ -10,7 +10,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Finance LLM Studio",
+  title: "LLM Studio",
   description: "A Next.js frontend for the finance inference gateway, provider comparison, and history tracking.",
 };
 

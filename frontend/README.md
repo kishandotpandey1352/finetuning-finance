@@ -1,4 +1,4 @@
-# Finance LLM Studio Frontend
+# LLM Studio Frontend
 
 Next.js + TypeScript + Tailwind frontend for the finance inference workspace.
 
