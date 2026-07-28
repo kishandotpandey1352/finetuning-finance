@@ -2,6 +2,7 @@ import { callFinanceEks } from "./financeEks";
 import { getPremiumProvider } from "./providers";
 import type { PremiumInferenceInput, PremiumInferenceOutput } from "./types";
 import { callOpenAI } from "./openai";
+import { callAnthropic } from "./anthropic";
 
 const allowedTasks = new Set(["summarize", "qa", "risk-analysis"]);
 
@@ -69,6 +70,10 @@ export async function runPremiumInference(
 
   if (input.providerId === "openai-premium") {
     return callOpenAI(input, startedAt);
+  }
+
+  if (input.providerId === "claude-premium") {
+    return callAnthropic(input, startedAt);
   }
 
   throw new Error(`Provider adapter is not implemented yet: ${input.providerId}`);

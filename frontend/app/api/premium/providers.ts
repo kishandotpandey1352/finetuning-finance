@@ -27,11 +27,11 @@ export const premiumProviders: Record<PremiumProviderId, PremiumProviderConfig> 
     id: "claude-premium",
     name: "Claude Premium",
     provider: "anthropic",
-    modelId: process.env.ANTHROPIC_PREMIUM_MODEL ?? "env:ANTHROPIC_PREMIUM_MODEL",
+    modelId: process.env.ANTHROPIC_PREMIUM_MODEL ?? "claude-sonnet-4-5",
     tier: "premium",
     costClass: "paid-api",
     privacy: "external-provider",
-    enabled: false,
+    enabled: Boolean(process.env.ANTHROPIC_API_KEY),
   },
 
   "gemini-premium": {
