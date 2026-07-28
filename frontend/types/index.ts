@@ -12,12 +12,23 @@ export interface AuthState {
 export interface ProviderOption {
   id: string;
   name: string;
-  provider: string;
+  provider:
+    | "finance-eks"
+    | "openai"
+    | "anthropic"
+    | "gemini"
+    | "bedrock"
+    | "vllm"
+    | "ollama";
   description: string;
   tier: Exclude<AppMode, "compare">;
   modelId: string;
+  costClass: "self-hosted" | "paid-api" | "free-local" | "aws-managed";
+  privacy: "internal" | "external-provider" | "aws-managed";
+  latency: "low" | "medium" | "high" | "variable";
   defaultTemperature: number;
   defaultMaxNewTokens: number;
+  enabled: boolean;
 }
 
 export interface UsageMetadata {
