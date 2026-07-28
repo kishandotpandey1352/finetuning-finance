@@ -145,8 +145,8 @@ export function ChatPanel({
     try {
       const result = await sendFinancePrompt({
         task,
-        prompt: prompt.trim(),
-        context: context.trim() || undefined,
+        prompt,
+        context,
         provider,
         mode,
         accessToken: auth?.accessToken,
