@@ -16,11 +16,11 @@ export const premiumProviders: Record<PremiumProviderId, PremiumProviderConfig> 
     id: "openai-premium",
     name: "OpenAI Premium",
     provider: "openai",
-    modelId: process.env.OPENAI_PREMIUM_MODEL ?? "env:OPENAI_PREMIUM_MODEL",
+    modelId: process.env.OPENAI_PREMIUM_MODEL ?? "gpt-4.1-mini",
     tier: "premium",
     costClass: "paid-api",
     privacy: "external-provider",
-    enabled: false,
+    enabled: Boolean(process.env.OPENAI_API_KEY),
   },
 
   "claude-premium": {
