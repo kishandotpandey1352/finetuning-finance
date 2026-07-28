@@ -38,11 +38,11 @@ export const premiumProviders: Record<PremiumProviderId, PremiumProviderConfig> 
     id: "gemini-premium",
     name: "Gemini Premium",
     provider: "gemini",
-    modelId: process.env.GEMINI_PREMIUM_MODEL ?? "env:GEMINI_PREMIUM_MODEL",
+    modelId: process.env.GEMINI_PREMIUM_MODEL ?? "gemini-2.5-flash",
     tier: "premium",
     costClass: "paid-api",
     privacy: "external-provider",
-    enabled: false,
+    enabled: Boolean(process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY),
   },
 
   "bedrock-premium": {
