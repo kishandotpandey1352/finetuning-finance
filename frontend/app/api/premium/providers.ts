@@ -49,11 +49,11 @@ export const premiumProviders: Record<PremiumProviderId, PremiumProviderConfig> 
     id: "bedrock-premium",
     name: "Amazon Bedrock Premium",
     provider: "bedrock",
-    modelId: process.env.BEDROCK_MODEL_ID ?? "env:BEDROCK_MODEL_ID",
+    modelId: process.env.BEDROCK_MODEL_ID ?? "us.amazon.nova-micro-v1:0",
     tier: "premium",
     costClass: "aws-managed",
     privacy: "aws-managed",
-    enabled: false,
+    enabled: Boolean(process.env.BEDROCK_MODEL_ID),
   },
 
   "vllm-qwen-7b": {

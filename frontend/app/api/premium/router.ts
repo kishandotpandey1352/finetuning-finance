@@ -4,6 +4,7 @@ import type { PremiumInferenceInput, PremiumInferenceOutput } from "./types";
 import { callOpenAI } from "./openai";
 import { callAnthropic } from "./anthropic";
 import { callGemini } from "./gemini";
+import { callBedrock } from "./bedrock";
 
 const allowedTasks = new Set(["summarize", "qa", "risk-analysis"]);
 
@@ -79,6 +80,10 @@ export async function runPremiumInference(
 
   if (input.providerId === "gemini-premium") {
     return callGemini(input, startedAt);
+  }
+
+  if (input.providerId === "bedrock-premium") {
+    return callBedrock(input, startedAt);
   }
 
   throw new Error(`Provider adapter is not implemented yet: ${input.providerId}`);
