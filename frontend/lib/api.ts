@@ -55,6 +55,18 @@ function getPremiumProviderId(provider: ChatRequestInput["provider"]) {
   return provider.id;
 }
 
+function shouldUsePremiumRoute(input: ChatRequestInput) {
+  if (input.mode === "premium") {
+    return true;
+  }
+
+  if (input.mode === "compare") {
+    return input.provider.tier === "premium";
+  }
+
+  return false;
+}
+
 function buildBasicRequestBody(input: ChatRequestInput) {
   const maxNewTokens = input.maxNewTokens ?? input.provider.defaultMaxNewTokens;
   const temperature = input.temperature ?? input.provider.defaultTemperature;
@@ -91,7 +103,7 @@ function buildBasicRequestBody(input: ChatRequestInput) {
 function buildPremiumRequestBody(input: ChatRequestInput) {
   return {
     providerId: getPremiumProviderId(input.provider),
-    mode: "premium",
+    mode: input.mode === "compare" ? "compare" : "premium",
     task: input.task,
     prompt: input.prompt,
     context: input.context ?? "",
@@ -198,12 +210,44 @@ function mockResponse(input: ChatRequestInput, variant = 0): FinanceResponse {
   };
 }
 
+function failedComparisonResponse(
+  input: ChatRequestInput,
+  error: unknown,
+): FinanceResponse {
+  const message =
+    error instanceof Error ? error.message : "Provider request failed";
+
+  return {
+    id: `error-${Date.now()}-${input.provider.id}`,
+    prompt: input.prompt,
+    title: `${input.provider.name} failed`,
+    output: `Provider unavailable: ${message}`,
+    provider: input.provider.provider,
+    modelId: input.provider.modelId,
+    task: input.task,
+    mode: input.mode,
+    createdAt: new Date().toISOString(),
+    usage: buildUsage({
+      provider: input.provider.provider,
+      modelId: input.provider.modelId,
+      task: input.task,
+      prompt: input.prompt,
+      output: message,
+      latencyMs: 1,
+      source: "live",
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    }),
+  };
+}
+
 async function postInference(input: ChatRequestInput): Promise<InferenceResponse> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 10 * 60 * 1000);
 
   const startedAt = now();
-  const isPremium = input.mode === "premium";
+  const isPremium = shouldUsePremiumRoute(input);
 
   const endpoint = isPremium
     ? "/api/premium/inference"
@@ -294,16 +338,50 @@ export async function sendFinancePrompt(
 export async function runComparison(
   input: ComparisonRequestInput,
 ): Promise<ComparisonResult> {
-  const left = await sendFinancePrompt({
+  if (USE_MOCK_BACKEND) {
+    const left = mockResponse(
+      {
+        task: input.task,
+        prompt: input.prompt,
+        context: input.context,
+        provider: input.leftProvider,
+        mode: "compare",
+        accessToken: input.accessToken,
+        temperature: input.leftProvider.defaultTemperature,
+        maxNewTokens: input.leftProvider.defaultMaxNewTokens,
+      },
+      0,
+    );
+
+    const right = mockResponse(
+      {
+        task: input.task,
+        prompt: input.prompt,
+        context: input.context,
+        provider: input.rightProvider,
+        mode: "compare",
+        accessToken: input.accessToken,
+        temperature: input.rightProvider.defaultTemperature + 0.05,
+        maxNewTokens: input.rightProvider.defaultMaxNewTokens,
+      },
+      1,
+    );
+
+    return { left, right };
+  }
+
+  const leftInput: ChatRequestInput = {
     task: input.task,
     prompt: input.prompt,
     context: input.context,
     provider: input.leftProvider,
     mode: "compare",
     accessToken: input.accessToken,
-  });
+    temperature: input.leftProvider.defaultTemperature,
+    maxNewTokens: input.leftProvider.defaultMaxNewTokens,
+  };
 
-  const right = await sendFinancePrompt({
+  const rightInput: ChatRequestInput = {
     task: input.task,
     prompt: input.prompt,
     context: input.context,
@@ -311,7 +389,26 @@ export async function runComparison(
     mode: "compare",
     accessToken: input.accessToken,
     temperature: input.rightProvider.defaultTemperature + 0.05,
-  });
+    maxNewTokens: input.rightProvider.defaultMaxNewTokens,
+  };
 
-  return { left, right };
+  const [leftResult, rightResult] = await Promise.allSettled([
+    sendFinancePrompt(leftInput),
+    sendFinancePrompt(rightInput),
+  ]);
+
+  const left =
+    leftResult.status === "fulfilled"
+      ? leftResult.value
+      : failedComparisonResponse(leftInput, leftResult.reason);
+
+  const right =
+    rightResult.status === "fulfilled"
+      ? rightResult.value
+      : failedComparisonResponse(rightInput, rightResult.reason);
+
+  return {
+    left,
+    right,
+  };
 }
