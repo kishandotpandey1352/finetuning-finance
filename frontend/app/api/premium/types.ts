@@ -27,6 +27,15 @@ export type PremiumInferenceOutput = {
   output: string;
   latency_ms: number;
   source: "premium";
+  request_id?: string;
+  fallback_used?: boolean;
+  fallback_from?: PremiumProviderId;
+  error?: {
+    providerId: PremiumProviderId;
+    message: string;
+    code?: string;
+    retryable?: boolean;
+  };
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;

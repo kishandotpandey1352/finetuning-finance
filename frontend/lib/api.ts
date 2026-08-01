@@ -10,6 +10,7 @@ const USE_MOCK_BACKEND =
   (process.env.NEXT_PUBLIC_USE_MOCK_BACKEND ?? "true").toLowerCase() === "true";
 
 type InferenceResponse = {
+  ok?: boolean;
   id?: string;
   provider?: string;
   providerId?: string;
@@ -17,6 +18,10 @@ type InferenceResponse = {
   output?: string;
   latency_ms?: number;
   source?: "premium" | "basic" | "live" | "mock";
+  request_id?: string;
+  fallback_used?: boolean;
+  fallback_from?: string;
+  error?: string;
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
@@ -304,7 +309,12 @@ export async function sendFinancePrompt(
   const payload = await postInference(input);
   const createdAt = new Date().toISOString();
 
-  const output = payload.output ?? "";
+  const fallbackNote =
+        payload.fallback_used && payload.fallback_from
+          ? `\n\nFallback used: ${payload.fallback_from} -> ${payload.providerId ?? payload.provider}`
+          : "";
+
+const output = `${payload.output ?? ""}${fallbackNote}`;
   const provider = payload.provider ?? input.provider.provider;
   const modelId = payload.model_id ?? input.provider.modelId;
   const latencyMs =
