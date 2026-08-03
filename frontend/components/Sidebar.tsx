@@ -19,6 +19,12 @@ const navItems = [
     accent: "cyan",
   },
   {
+    href: "/doc-search",
+    label: "Doc Search",
+    description: "RAG",
+    accent: "lime",
+  },
+  {
     href: "/compare",
     label: "Compare",
     description: "Models",
@@ -43,6 +49,16 @@ const pageThemes = {
     chip: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
     sublabel: "text-cyan-200",
   },
+  lime: {
+    panel: "border-lime-300/20 bg-lime-300/5",
+    active:
+      "border-lime-300/60 bg-lime-300/15 text-lime-50 shadow-[0_0_28px_rgba(190,242,100,0.14)]",
+    inactive:
+      "border-white/10 bg-white/5 text-slate-300 hover:border-lime-300/35 hover:bg-lime-300/10 hover:text-white",
+    eyebrow: "text-lime-200/70",
+    chip: "border-lime-300/25 bg-lime-300/10 text-lime-100",
+    sublabel: "text-lime-200",
+  },
   violet: {
     panel: "border-violet-300/20 bg-violet-300/5",
     active:
@@ -66,6 +82,10 @@ const pageThemes = {
 } as const;
 
 function getActiveTheme(pathname: string) {
+  if (pathname.startsWith("/doc-search")) {
+    return pageThemes.lime;
+  }
+
   if (pathname.startsWith("/compare")) {
     return pageThemes.violet;
   }
@@ -77,9 +97,16 @@ function getActiveTheme(pathname: string) {
   return pageThemes.cyan;
 }
 
-export function Sidebar({ displayName, onLogout }: SidebarProps) {
+export function Sidebar({ displayName, mode, onLogout }: SidebarProps) {
   const pathname = usePathname();
   const theme = getActiveTheme(pathname);
+
+  const modeLabel =
+    mode === "compare"
+      ? "Compare Mode"
+      : mode === "premium"
+        ? "Premium"
+        : "Basic";
 
   return (
     <aside className={`soft-panel border ${theme.panel} p-5 sm:p-6`}>
@@ -108,7 +135,7 @@ export function Sidebar({ displayName, onLogout }: SidebarProps) {
             </span>
 
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
-              Local Gateway
+              {modeLabel}
             </span>
           </div>
         </div>
