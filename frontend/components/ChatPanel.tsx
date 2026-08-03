@@ -10,6 +10,7 @@ import type {
   AuthState,
   FinanceResponse,
   FinanceTask,
+  HistoryAttachment,
   HistoryEntry,
   ProviderOption,
 } from "@/types";
@@ -111,14 +112,31 @@ const taskCopy: Record<
   },
 };
 
+function toHistoryAttachments(
+  activeAttachments: ChatAttachment[],
+): HistoryAttachment[] {
+  return activeAttachments.map((attachment) => ({
+    id: attachment.id,
+    name: attachment.name,
+    type: attachment.type,
+    size: attachment.size,
+    kind: attachment.kind,
+    pageCount: attachment.pageCount,
+    truncated: attachment.truncated,
+    extractedChars: attachment.text?.length ?? 0,
+  }));
+}
+
 function makeHistoryEntry(
   response: FinanceResponse,
   context?: string,
+  attachments?: HistoryAttachment[],
 ): HistoryEntry {
   return {
     ...response,
     sourcePrompt: response.prompt,
     context,
+    attachments,
   };
 }
 
@@ -145,6 +163,23 @@ function formatFileSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
+// function buildAttachmentContext(attachment: ChatAttachment) {
+//   if (!attachment.text?.trim()) {
+//     return "";
+//   }
+
+//   const metadata = [
+//     `File: ${attachment.name}`,
+//     `Type: ${attachment.kind}`,
+//     attachment.pageCount ? `Pages: ${attachment.pageCount}` : undefined,
+//     attachment.truncated ? "Note: extracted text was truncated" : undefined,
+//   ]
+//     .filter(Boolean)
+//     .join(" | ");
+
+//   return `\n\n--- Attached document context (${metadata}) ---\n${attachment.text.trim()}\n--- End attached document context ---`;
+// }
+
 function buildAttachmentContext(attachment: ChatAttachment) {
   if (!attachment.text?.trim()) {
     return "";
@@ -160,6 +195,13 @@ function buildAttachmentContext(attachment: ChatAttachment) {
     .join(" | ");
 
   return `\n\n--- Attached document context (${metadata}) ---\n${attachment.text.trim()}\n--- End attached document context ---`;
+}
+
+function buildActiveAttachmentContext(activeAttachments: ChatAttachment[]) {
+  return activeAttachments
+    .filter((attachment) => attachment.text?.trim())
+    .map((attachment) => buildAttachmentContext(attachment))
+    .join("\n\n");
 }
 
 export function ChatPanel({
@@ -189,12 +231,12 @@ export function ChatPanel({
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   useEffect(() => {
-    setPrompt(taskCopy[task].defaultPrompt);
-    setContext(taskCopy[task].defaultContext);
-    setAttachments([]);
-    setAttachmentError(null);
-    setResponse(null);
-    setError(null);
+      setPrompt(taskCopy[task].defaultPrompt);
+      setContext(taskCopy[task].defaultContext);
+      setAttachments([]);
+      setAttachmentError(null);
+      setResponse(null);
+      setError(null);
 }, [task]);
 
   useEffect(() => {
@@ -234,22 +276,18 @@ export function ChatPanel({
       }
 
       const attachment = payload.attachment;
-      
+
+      setAttachments((current) => [...current, attachment]);
+
       if (!attachment.text?.trim() && attachment.kind !== "image") {
         setAttachmentError(
           `${attachment.name} was uploaded, but no text could be extracted.`,
         );
       }
 
-      setAttachments((current) => [...current, attachment]);
-
-      const attachmentContext = buildAttachmentContext(attachment);
-
-      if (attachmentContext) {
-        setContext((current) =>
-          current.trim()
-            ? `${current.trim()}${attachmentContext}`
-            : attachmentContext.trim(),
+      if (attachment.truncated) {
+        setAttachmentError(
+          `${attachment.name} was extracted, but the text was truncated before being sent to the model.`,
         );
       }
 
@@ -295,11 +333,19 @@ function handleClearAttachments() {
     setError(null);
     setLoading(true);
 
+    const activeAttachmentContext = buildActiveAttachmentContext(attachments);
+
+    const combinedContext = [context.trim(), activeAttachmentContext.trim()]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const historyAttachments = toHistoryAttachments(attachments);
+
     try {
       const result = await sendFinancePrompt({
         task,
         prompt,
-        context,
+        context: combinedContext,
         provider,
         mode,
         accessToken: auth?.accessToken,
@@ -312,6 +358,7 @@ function handleClearAttachments() {
       const historyEntry = makeHistoryEntry(
         result,
         context.trim() || undefined,
+        historyAttachments.length ? historyAttachments : undefined,
       );
       appendHistory(historyEntry);
       onSaved?.(historyEntry);
@@ -400,9 +447,16 @@ function handleClearAttachments() {
                 Attachments
               </p>
               <p className="mt-1 text-sm text-slate-400">
-                Upload PDF, DOCX, TXT, MD, or CSV files. Extracted text is added to
-                the context box.
+                Upload PDF, DOCX, TXT, MD, or CSV files. Uploaded files are included as document context when you run the task.
               </p>
+
+              {attachments.length ? (
+                <p className="mt-2 text-xs font-medium text-cyan-100/80">
+                  {attachments.length} active attachment
+                  {attachments.length === 1 ? "" : "s"} will be included in the next run.
+                </p>
+              ) : null}
+
             </div>
 
             <label className="cursor-pointer rounded-2xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/20">

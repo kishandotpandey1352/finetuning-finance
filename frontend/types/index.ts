@@ -60,9 +60,29 @@ export interface ComparisonResult {
   right: FinanceResponse;
 }
 
+export type AttachmentKind =
+  | "pdf"
+  | "docx"
+  | "text"
+  | "csv"
+  | "image"
+  | "unknown";
+
+export interface HistoryAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  kind: AttachmentKind;
+  pageCount?: number;
+  truncated?: boolean;
+  extractedChars?: number;
+}
+
 export interface HistoryEntry extends FinanceResponse {
   sourcePrompt: string;
   context?: string;
+  attachments?: HistoryAttachment[];
 }
 
 export interface ChatRequestInput {
@@ -84,3 +104,5 @@ export interface ComparisonRequestInput {
   task: FinanceTask;
   accessToken?: string;
 }
+
+
