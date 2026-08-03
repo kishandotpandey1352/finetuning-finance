@@ -1,11 +1,31 @@
-__pycache__/
-.env
-.venv/
-data/raw/
-data/cleaned/
-data/instruction/
-models/
-outputs/
-mlruns/
+# Terraform local/cache/state files
+**/.terraform/
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+crash.*.log
+*.json
+*.csv
 *.pt
+*.pth
+*.bin
+*.jinja
 *.safetensors
+
+
+*.jsonl
+*.txt
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.env
+.env.local

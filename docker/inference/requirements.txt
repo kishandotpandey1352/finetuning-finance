@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+prometheus-client
+python-dotenv
+boto3
+torch
+transformers
+accelerate
+peft
+bitsandbytes
+safetensors
+sentencepiece
+protobuf
