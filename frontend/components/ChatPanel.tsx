@@ -63,7 +63,8 @@ const taskCopy: Record<
     secondaryLabel: "Context",
     secondaryPlaceholder:
       "Paste the source material the model should use to answer the question...",
-    defaultPrompt: "What caused margin pressure, and what should investors monitor next quarter?",
+    defaultPrompt:
+      "What caused margin pressure, and what should investors monitor next quarter?",
     defaultContext:
       "Revenue increased 12 percent, but margins declined because input costs and interest expense rose. Operating cash flow improved, while management warned that higher interest rates may pressure demand next quarter.",
     runLabel: "Run Q&A",
@@ -88,12 +89,27 @@ const taskCopy: Record<
   },
 };
 
-function makeHistoryEntry(response: FinanceResponse, context?: string): HistoryEntry {
+function makeHistoryEntry(
+  response: FinanceResponse,
+  context?: string,
+): HistoryEntry {
   return {
     ...response,
     sourcePrompt: response.prompt,
     context,
   };
+}
+
+function getTaskLabel(task: FinanceTask) {
+  if (task === "summarize") {
+    return "Summarize";
+  }
+
+  if (task === "qa") {
+    return "Q&A";
+  }
+
+  return "Risk Analysis";
 }
 
 export function ChatPanel({
@@ -111,7 +127,9 @@ export function ChatPanel({
   const [prompt, setPrompt] = useState(currentTaskCopy.defaultPrompt);
   const [context, setContext] = useState(currentTaskCopy.defaultContext);
   const [temperature, setTemperature] = useState(provider.defaultTemperature);
-  const [maxNewTokens, setMaxNewTokens] = useState(provider.defaultMaxNewTokens);
+  const [maxNewTokens, setMaxNewTokens] = useState(
+    provider.defaultMaxNewTokens,
+  );
   const [response, setResponse] = useState<FinanceResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,7 +148,9 @@ export function ChatPanel({
 
   async function handleSubmit() {
     if (!prompt.trim()) {
-      setError(`Add ${currentTaskCopy.primaryLabel.toLowerCase()} before submitting.`);
+      setError(
+        `Add ${currentTaskCopy.primaryLabel.toLowerCase()} before submitting.`,
+      );
       return;
     }
 
@@ -156,11 +176,18 @@ export function ChatPanel({
 
       setResponse(result);
 
-      const historyEntry = makeHistoryEntry(result, context.trim() || undefined);
+      const historyEntry = makeHistoryEntry(
+        result,
+        context.trim() || undefined,
+      );
       appendHistory(historyEntry);
       onSaved?.(historyEntry);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "The request failed.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "The request failed.",
+      );
     } finally {
       setLoading(false);
     }
@@ -183,27 +210,51 @@ export function ChatPanel({
   return (
     <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
       <div className="space-y-5 rounded-[32px] border border-white/10 bg-panel/85 p-6 shadow-halo backdrop-blur-xl">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/70">
+            Prompt console
+          </p>
+          <h2 className="mt-2 text-3xl font-semibold text-white">
+            Run the selected finance task
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+            Enter finance text, add instructions or context, and run the selected
+            task with the model chosen from the workflow dropdown.
+          </p>
+        </div>
+
+        <div className="space-y-3 rounded-3xl border border-white/10 bg-black/20 p-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/70">
-              Chat Workspace
+            <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/70">
+              Finance task
             </p>
-            <h2 className="mt-2 text-3xl font-semibold text-white">
-              Run the selected finance workflow
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-              This request uses the mode, task type, and provider selected in the Workflow tab.
+            <p className="mt-1 text-sm text-slate-400">
+              Choose what the selected model should do with your finance input.
             </p>
           </div>
 
-          <div className="rounded-3xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-sm text-cyan-100">
-            <p className="text-xs uppercase tracking-[0.22em] text-cyan-200/70">
-              Current workflow
-            </p>
-            <p className="mt-1 font-semibold capitalize">
-              {mode} � {task} � {provider.name}
-            </p>
-            <p className="mt-2 text-xs text-cyan-100/80">{currentTaskCopy.route}</p>
+          <div className="flex flex-wrap gap-3">
+            {(["summarize", "qa", "risk-analysis"] as FinanceTask[]).map(
+              (item) => {
+                const isActive = task === item;
+
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => onTaskChange(item)}
+                    className={[
+                      "rounded-2xl border px-5 py-2.5 text-sm font-semibold transition",
+                      isActive
+                        ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-50 shadow-[0_0_24px_rgba(103,232,249,0.12)]"
+                        : "border-white/10 bg-white/0 text-slate-300 hover:border-cyan-300/30 hover:bg-cyan-300/10 hover:text-white",
+                    ].join(" ")}
+                  >
+                    {getTaskLabel(item)}
+                  </button>
+                );
+              },
+            )}
           </div>
         </div>
 
@@ -211,7 +262,9 @@ export function ChatPanel({
           <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
             Task guidance
           </p>
-          <p className="mt-2 text-sm leading-6 text-slate-300">{currentTaskCopy.helperText}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            {currentTaskCopy.helperText}
+          </p>
         </div>
 
         <label className="block space-y-2">
@@ -261,7 +314,9 @@ export function ChatPanel({
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-200">Temperature</span>
+            <span className="text-sm font-medium text-slate-200">
+              Temperature
+            </span>
             <input
               type="range"
               min="0"
@@ -275,7 +330,9 @@ export function ChatPanel({
           </label>
 
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-200">Max new tokens</span>
+            <span className="text-sm font-medium text-slate-200">
+              Max new tokens
+            </span>
             <input
               type="range"
               min="32"
@@ -343,20 +400,28 @@ export function ChatPanel({
           <ResponseCard response={response} />
         ) : (
           <div className="rounded-[32px] border border-white/10 bg-panel/80 p-6 shadow-halo backdrop-blur-xl">
-            <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Output</p>
-            <h3 className="mt-2 text-xl font-semibold text-white">Waiting for the first run</h3>
+            <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
+              Output
+            </p>
+            <h3 className="mt-2 text-xl font-semibold text-white">
+              Waiting for the first run
+            </h3>
             <p className="mt-3 text-sm leading-7 text-slate-400">
-              The response panel will show the generated summary, answer, or risk analysis, plus token and latency metadata.
+              The response panel will show the generated summary, answer, or
+              risk analysis, plus token and latency metadata.
             </p>
           </div>
         )}
 
         <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 text-sm text-slate-300">
-          <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Current route</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
+            Current route
+          </p>
           <p className="mt-2 text-white">{currentTaskCopy.route}</p>
           <p className="mt-3 leading-7">
             {mode === "basic" ? "Basic" : "Premium"} mode will run the selected{" "}
-            <span className="font-semibold text-white">{task}</span> task through{" "}
+            <span className="font-semibold text-white">{getTaskLabel(task)}</span>{" "}
+            task through{" "}
             <span className="font-semibold text-white">{provider.name}</span>.
           </p>
         </div>

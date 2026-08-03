@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import type { AppMode } from "@/types";
 
 type SidebarProps = {
@@ -13,140 +14,149 @@ type SidebarProps = {
 const navItems = [
   {
     href: "/dashboard",
-    label: "Dashboard",
-    action: "Open",
-    color: "cyan",
+    label: "Workspace",
+    description: "Chat",
+    accent: "cyan",
   },
   {
     href: "/compare",
     label: "Compare",
-    action: "Go",
-    color: "violet",
+    description: "Models",
+    accent: "violet",
   },
   {
     href: "/history",
     label: "History",
-    action: "Go",
-    color: "emerald",
-  },
-  {
-    href: "/login",
-    label: "Login",
-    action: "Go",
-    color: "amber",
+    description: "Runs",
+    accent: "emerald",
   },
 ] as const;
 
-const navColorClasses = {
+const pageThemes = {
   cyan: {
-    active: "border-cyan-300/70 bg-cyan-300/15 text-cyan-50 shadow-[0_0_32px_rgba(103,232,249,0.14)]",
-    inactive: "border-cyan-300/20 bg-cyan-300/5 text-slate-300 hover:border-cyan-300/50 hover:bg-cyan-300/10 hover:text-cyan-50",
-    action: "text-cyan-200",
-    card: "border-cyan-300/30 bg-cyan-300/10",
-    title: "text-cyan-200",
+    panel: "border-cyan-300/20 bg-cyan-300/5",
+    active:
+      "border-cyan-300/60 bg-cyan-300/15 text-cyan-50 shadow-[0_0_28px_rgba(103,232,249,0.14)]",
+    inactive:
+      "border-white/10 bg-white/5 text-slate-300 hover:border-cyan-300/35 hover:bg-cyan-300/10 hover:text-white",
+    eyebrow: "text-cyan-200/70",
+    chip: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
+    sublabel: "text-cyan-200",
   },
   violet: {
-    active: "border-violet-300/70 bg-violet-300/15 text-violet-50 shadow-[0_0_32px_rgba(196,181,253,0.14)]",
-    inactive: "border-violet-300/20 bg-violet-300/5 text-slate-300 hover:border-violet-300/50 hover:bg-violet-300/10 hover:text-violet-50",
-    action: "text-violet-200",
-    card: "border-violet-300/30 bg-violet-300/10",
-    title: "text-violet-200",
+    panel: "border-violet-300/20 bg-violet-300/5",
+    active:
+      "border-violet-300/60 bg-violet-300/15 text-violet-50 shadow-[0_0_28px_rgba(196,181,253,0.14)]",
+    inactive:
+      "border-white/10 bg-white/5 text-slate-300 hover:border-violet-300/35 hover:bg-violet-300/10 hover:text-white",
+    eyebrow: "text-violet-200/70",
+    chip: "border-violet-300/25 bg-violet-300/10 text-violet-100",
+    sublabel: "text-violet-200",
   },
   emerald: {
-    active: "border-emerald-300/70 bg-emerald-300/15 text-emerald-50 shadow-[0_0_32px_rgba(110,231,183,0.14)]",
-    inactive: "border-emerald-300/20 bg-emerald-300/5 text-slate-300 hover:border-emerald-300/50 hover:bg-emerald-300/10 hover:text-emerald-50",
-    action: "text-emerald-200",
-    card: "border-emerald-300/30 bg-emerald-300/10",
-    title: "text-emerald-200",
+    panel: "border-emerald-300/20 bg-emerald-300/5",
+    active:
+      "border-emerald-300/60 bg-emerald-300/15 text-emerald-50 shadow-[0_0_28px_rgba(110,231,183,0.14)]",
+    inactive:
+      "border-white/10 bg-white/5 text-slate-300 hover:border-emerald-300/35 hover:bg-emerald-300/10 hover:text-white",
+    eyebrow: "text-emerald-200/70",
+    chip: "border-emerald-300/25 bg-emerald-300/10 text-emerald-100",
+    sublabel: "text-emerald-200",
   },
-  amber: {
-    active: "border-amber-300/70 bg-amber-300/15 text-amber-50 shadow-[0_0_32px_rgba(252,211,77,0.12)]",
-    inactive: "border-amber-300/20 bg-amber-300/5 text-slate-300 hover:border-amber-300/50 hover:bg-amber-300/10 hover:text-amber-50",
-    action: "text-amber-200",
-    card: "border-amber-300/30 bg-amber-300/10",
-    title: "text-amber-200",
-  },
-};
+} as const;
 
-export function Sidebar({ displayName, mode, onLogout }: SidebarProps) {
+function getActiveTheme(pathname: string) {
+  if (pathname.startsWith("/compare")) {
+    return pageThemes.violet;
+  }
+
+  if (pathname.startsWith("/history")) {
+    return pageThemes.emerald;
+  }
+
+  return pageThemes.cyan;
+}
+
+export function Sidebar({ displayName, onLogout }: SidebarProps) {
   const pathname = usePathname();
-
-  const activeNavItem = navItems.find((item) => pathname === item.href) ?? navItems[0];
-  const activeColor = navColorClasses[activeNavItem.color];
+  const theme = getActiveTheme(pathname);
 
   return (
-  <aside className="soft-panel p-5 sm:p-6">
-    <div className="flex flex-col gap-5">
-      <div>
-        <p className="text-xs uppercase tracking-[0.32em] text-cyan-200/70">
-          LLM Studio
-        </p>
-        <h2 className="mt-3 text-2xl font-semibold text-white">
-          {displayName}
-        </h2>
-        <p className="mt-2 text-sm text-slate-300">
-          JWT-ready frontend for the secure inference gateway.
-        </p>
-      </div>
+    <aside className={`soft-panel border ${theme.panel} p-5 sm:p-6`}>
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className={`text-xs uppercase tracking-[0.32em] ${theme.eyebrow}`}>
+              LLM Studio
+            </p>
 
-      <nav className="grid w-full grid-cols-4 gap-3">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          const color = navColorClasses[item.color];
+            <h2 className="mt-3 text-2xl font-semibold text-white">
+              {displayName}
+            </h2>
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={[
-                "group flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold transition",
-                isActive ? color.active : color.inactive,
-              ].join(" ")}
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              Secure finance inference workspace for provider-routed LLM
+              workflows.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] ${theme.chip}`}
             >
-              <span>{item.label}</span>
-              <span
-                className={[
-                  "text-[10px] uppercase tracking-[0.28em]",
-                  isActive ? color.action : "text-slate-500 group-hover:" + color.action,
-                ].join(" ")}
-              >
-                {item.action}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
+              Finance AI
+            </span>
 
-      <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-        <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
-          Active mode
-        </p>
-        <p className="mt-2 text-lg font-semibold capitalize text-white">
-          {mode}
-        </p>
-        <p className="mt-1 text-sm text-slate-400">
-          Basic, Premium, and Compare workflows are ready.
-        </p>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+              Local Gateway
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-white/10 pt-4 lg:flex-row lg:items-center lg:justify-between">
+          <nav className="flex flex-wrap gap-2">
+            {navItems.map((item) => {
+              const isActive =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname.startsWith(item.href);
+
+              const itemTheme = pageThemes[item.accent];
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={[
+                    "group rounded-2xl border px-4 py-3 text-sm font-semibold transition",
+                    isActive ? itemTheme.active : itemTheme.inactive,
+                  ].join(" ")}
+                >
+                  <span className="block">{item.label}</span>
+                  <span
+                    className={[
+                      "mt-0.5 block text-[10px] uppercase tracking-[0.18em]",
+                      isActive
+                        ? itemTheme.sublabel
+                        : "text-slate-500 group-hover:text-slate-200",
+                    ].join(" ")}
+                  >
+                    {item.description}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-rose-300/40 hover:bg-rose-400/10 hover:text-rose-100"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
-
-      <div>
-        <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
-          Security
-        </p>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          Tokens are stored locally and forwarded as Authorization plus
-          X-API-Key for gateway compatibility.
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onLogout}
-        className="self-start text-sm font-semibold text-slate-400 transition hover:text-white"
-      >
-        Sign out
-      </button>
-    </div>
-  </aside>
-);
+    </aside>
+  );
 }
