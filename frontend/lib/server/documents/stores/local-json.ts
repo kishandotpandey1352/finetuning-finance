@@ -152,6 +152,22 @@ export class LocalJsonVectorStore implements VectorStoreAdapter {
 
     await writeStore(data);
   }
+
+
+  async clearUserMemory(userId: string) {
+  const data = await readStore();
+
+    data.documents = data.documents.filter(
+      (document) => document.userId !== userId,
+    );
+
+    data.chunks = data.chunks.filter((chunk) => chunk.userId !== userId);
+
+    data.vectors = data.vectors.filter((vector) => vector.userId !== userId);
+
+    await writeStore(data);
+  }
+
 }
 
 export function getVectorStore() {

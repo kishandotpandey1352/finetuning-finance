@@ -1,6 +1,12 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import { Sidebar } from "@/components/Sidebar";
@@ -53,6 +59,7 @@ type RagQueryResponse = {
   sources?: RetrievedSource[];
   retrieval?: {
     topK?: number;
+    bestScore?: number;
     embeddingModel?: string;
     usage?: {
       prompt_tokens?: number;
@@ -62,11 +69,41 @@ type RagQueryResponse = {
   error?: string;
 };
 
+type DocumentStorageProfile =
+  | "session"
+  | "local-json"
+  | "local-sqlite"
+  | "supabase-pgvector"
+  | "aws"
+  | "export-import";
+
+type RagStorageConfig = {
+  profile: DocumentStorageProfile;
+  originalFileStorage: string;
+  vectorStorage: string;
+  metadataStorage: string;
+  historyStorage: string;
+  storeOriginalFiles: boolean;
+  embeddingProvider: string;
+  embeddingModel: string;
+  chunkSizeChars: number;
+  chunkOverlapChars: number;
+  retrievalTopK: number;
+  maxIndexedChars: number;
+  updatedAt: string;
+};
+
+type DisabledProfile = {
+  profile: DocumentStorageProfile;
+  label: string;
+  reason: string;
+};
+
 const providerOptions = [
   {
     id: "openai-premium",
     name: "OpenAI Premium",
-    description: "Recommended for Phase 2A RAG testing.",
+    description: "Recommended for Phase 2A/2B RAG testing.",
   },
   {
     id: "claude-premium",
@@ -128,8 +165,19 @@ function formatDate(value: string) {
   }
 }
 
+function profileLabel(profile?: DocumentStorageProfile) {
+  if (profile === "session") return "Session only";
+  if (profile === "local-json") return "Local project storage";
+  if (profile === "local-sqlite") return "Local SQLite";
+  if (profile === "supabase-pgvector") return "Supabase pgvector";
+  if (profile === "aws") return "AWS";
+  if (profile === "export-import") return "Export/import";
+  return "Loading";
+}
+
 export default function DocSearchPage() {
   const router = useRouter();
+  const configRef = useRef<HTMLDivElement | null>(null);
 
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [documents, setDocuments] = useState<StoredDocument[]>([]);
@@ -154,6 +202,14 @@ export default function DocSearchPage() {
   const [sources, setSources] = useState<RetrievedSource[]>([]);
   const [latestRequestId, setLatestRequestId] = useState<string | null>(null);
 
+  const [ragConfig, setRagConfig] = useState<RagStorageConfig | null>(null);
+  const [disabledProfiles, setDisabledProfiles] = useState<DisabledProfile[]>(
+    [],
+  );
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [pendingProfile, setPendingProfile] =
+    useState<DocumentStorageProfile | null>(null);
+
   const selectedDocuments = useMemo(
     () =>
       documents.filter((document) =>
@@ -165,6 +221,7 @@ export default function DocSearchPage() {
   useEffect(() => {
     setAuth(loadAuth());
     void loadDocuments();
+    void loadRagConfig();
   }, []);
 
   async function loadDocuments() {
@@ -202,6 +259,125 @@ export default function DocSearchPage() {
       );
     } finally {
       setLoadingDocuments(false);
+    }
+  }
+
+  async function loadRagConfig() {
+    try {
+      const response = await fetch("/api/documents/config", {
+        cache: "no-store",
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Failed to load RAG configuration.");
+      }
+
+      setRagConfig(payload.config);
+      setDisabledProfiles(payload.disabledProfiles ?? []);
+    } catch (configError) {
+      setError(
+        configError instanceof Error
+          ? configError.message
+          : "Failed to load RAG configuration.",
+      );
+    }
+  }
+
+  function scrollToConfig() {
+    configRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
+  async function handleChangeStorageProfile(profile: DocumentStorageProfile) {
+    if (profile === ragConfig?.profile) {
+      setStatusMessage(`${profileLabel(profile)} is already active.`);
+      return;
+    }
+
+    setSavingConfig(true);
+    setPendingProfile(profile);
+    setError(null);
+    setStatusMessage(
+      `Switching RAG storage profile to ${profileLabel(profile)}...`,
+    );
+
+    try {
+      const response = await fetch("/api/documents/config", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ profile }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Failed to update RAG configuration.");
+      }
+
+      setRagConfig(payload.config);
+
+      const warnings = Array.isArray(payload.warnings) ? payload.warnings : [];
+
+      setStatusMessage(
+        warnings.length
+          ? `RAG configuration updated to ${profileLabel(
+              payload.config.profile,
+            )}. ${warnings.join(" ")}`
+          : `RAG configuration updated to ${profileLabel(
+              payload.config.profile,
+            )}.`,
+      );
+
+      await loadDocuments();
+    } catch (configError) {
+      setError(
+        configError instanceof Error
+          ? configError.message
+          : "Failed to update RAG configuration.",
+      );
+    } finally {
+      setSavingConfig(false);
+      setPendingProfile(null);
+    }
+  }
+
+  async function handleClearDocumentMemory() {
+    const confirmed = window.confirm(
+      "Clear all local document memory for this user? This removes indexed documents, chunks, and vectors. Original files are not stored.",
+    );
+
+    if (!confirmed) return;
+
+    setError(null);
+    setStatusMessage(null);
+
+    try {
+      const response = await fetch("/api/documents/clear", {
+        method: "DELETE",
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Failed to clear document memory.");
+      }
+
+      setDocuments([]);
+      setSelectedDocumentIds([]);
+      setAnswer(null);
+      setSources([]);
+      setStatusMessage("All local document memory was cleared.");
+    } catch (clearError) {
+      setError(
+        clearError instanceof Error
+          ? clearError.message
+          : "Failed to clear document memory.",
+      );
     }
   }
 
@@ -281,7 +457,9 @@ export default function DocSearchPage() {
     const target = documents.find((document) => document.id === documentId);
 
     const confirmed = window.confirm(
-      `Delete ${target?.fileName ?? "this document"} from local document memory? This removes metadata, chunks, and vectors.`,
+      `Delete ${
+        target?.fileName ?? "this document"
+      } from local document memory? This removes metadata, chunks, and vectors.`,
     );
 
     if (!confirmed) return;
@@ -363,10 +541,19 @@ export default function DocSearchPage() {
       setAnswer(payload.answer ?? null);
       setSources(payload.sources ?? []);
       setLatestRequestId(payload.request_id ?? null);
+
+      const bestScore = payload.retrieval?.bestScore;
+
       setStatusMessage(
         `Retrieved ${(payload.sources ?? []).length} source chunk${
           (payload.sources ?? []).length === 1 ? "" : "s"
-        } using ${payload.retrieval?.embeddingModel ?? "the configured embedding model"}.`,
+        } using ${
+          payload.retrieval?.embeddingModel ?? "the configured embedding model"
+        }.${
+          typeof bestScore === "number" && bestScore < 0.3
+            ? " Low retrieval confidence: review the source snippets."
+            : ""
+        }`,
       );
     } catch (queryError) {
       setError(
@@ -406,7 +593,7 @@ export default function DocSearchPage() {
                   RAG active
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-                  Storage: local project
+                  Storage: {profileLabel(ragConfig?.profile)}
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
                   Original files: not stored
@@ -414,14 +601,24 @@ export default function DocSearchPage() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={loadDocuments}
-              disabled={loadingDocuments}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loadingDocuments ? "Refreshing..." : "Refresh documents"}
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={scrollToConfig}
+                className="rounded-2xl border border-lime-300/20 bg-lime-300/10 px-4 py-3 text-sm font-medium text-lime-50 transition hover:border-lime-200/40 hover:bg-lime-300/20"
+              >
+                RAG Configuration
+              </button>
+
+              <button
+                type="button"
+                onClick={loadDocuments}
+                disabled={loadingDocuments}
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loadingDocuments ? "Refreshing..." : "Refresh documents"}
+              </button>
+            </div>
           </section>
 
           {error ? (
@@ -547,47 +744,300 @@ export default function DocSearchPage() {
                 </div>
               </div>
 
-              <div className="soft-panel p-6">
-                <p className="text-xs uppercase tracking-[0.22em] text-purple-200/70">
-                  RAG Configuration
-                </p>
-                <h2 className="mt-2 text-xl font-semibold text-white">
-                  Phase 2A local profile
-                </h2>
-
-                <div className="mt-4 space-y-3 text-sm text-slate-300">
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <p className="font-semibold text-white">
-                      Storage profile: Local project storage
+              <div ref={configRef} className="soft-panel p-6 scroll-mt-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-lime-200/70">
+                      RAG Configuration
                     </p>
-                    <p className="mt-1 text-slate-400">
-                      Metadata, chunks, and vectors are stored under{" "}
-                      <code className="rounded bg-black/40 px-1 py-0.5 text-cyan-100">
-                        frontend/.data/document-memory
-                      </code>
-                      .
+                    <h2 className="mt-2 text-xl font-semibold text-white">
+                      Storage profile
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">
+                      Phase 2B lets users choose safe storage profiles. Cloud
+                      adapters are visible but disabled until Phase 2C.
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <p className="font-semibold text-white">
-                      Original file storage: Off
-                    </p>
-                    <p className="mt-1 text-slate-400">
-                      Uploaded files are processed for indexing, but the original
-                      file is not persisted in Phase 2A.
-                    </p>
+                  <span className="rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-lime-100">
+                    {ragConfig?.profile ?? "loading"}
+                  </span>
+                </div>
+
+                <div className="mt-5 space-y-5">
+                  <div className="rounded-3xl border border-lime-300/20 bg-lime-300/10 p-4">
+                    <label className="block">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-100/80">
+                        Editable now
+                      </span>
+
+                      <p className="mt-2 text-sm leading-6 text-slate-300">
+                        Choose where Phase 2B document memory should live.
+                        Cloud and BYO storage options stay locked until their
+                        adapters are implemented.
+                      </p>
+
+                      <select
+                        value={ragConfig?.profile ?? "local-json"}
+                        disabled={savingConfig}
+                        onChange={(event) =>
+                          handleChangeStorageProfile(
+                            event.target.value as DocumentStorageProfile,
+                          )
+                        }
+                        className="mt-4 w-full rounded-2xl border border-lime-300/25 bg-black/40 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-lime-200/60 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="local-json">
+                          Local project storage
+                        </option>
+                        <option value="session">Session only</option>
+                      </select>
+
+                      {savingConfig ? (
+                        <p className="mt-2 text-xs text-lime-100">
+                          Saving{" "}
+                          {pendingProfile
+                            ? profileLabel(pendingProfile)
+                            : "configuration"}
+                          ...
+                        </p>
+                      ) : null}
+                    </label>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <p className="font-semibold text-white">
-                      Coming later in 2B/2C
-                    </p>
-                    <p className="mt-1 text-slate-400">
-                      Session-only profile, SQLite, Supabase pgvector, AWS, and
-                      export/import controls.
-                    </p>
+                  <div className="grid gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleChangeStorageProfile("local-json")}
+                      disabled={savingConfig}
+                      className={[
+                        "rounded-3xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
+                        ragConfig?.profile === "local-json"
+                          ? "border-lime-300/40 bg-lime-300/10"
+                          : "border-white/10 bg-black/20 hover:border-lime-300/25 hover:bg-lime-300/5",
+                      ].join(" ")}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="font-semibold text-white">
+                          Local project storage
+                        </p>
+                        {ragConfig?.profile === "local-json" ? (
+                          <span className="rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-100">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
+                            Click to activate
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="mt-1 text-sm leading-6 text-slate-400">
+                        Stores metadata, chunks, and vectors under{" "}
+                        <code className="rounded bg-black/40 px-1 py-0.5 text-lime-100">
+                          frontend/.data/document-memory
+                        </code>
+                        . Original files remain off.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleChangeStorageProfile("session")}
+                      disabled={savingConfig}
+                      className={[
+                        "rounded-3xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
+                        ragConfig?.profile === "session"
+                          ? "border-cyan-300/40 bg-cyan-300/10"
+                          : "border-white/10 bg-black/20 hover:border-cyan-300/25 hover:bg-cyan-300/5",
+                      ].join(" ")}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="font-semibold text-white">
+                          Session only
+                        </p>
+                        {ragConfig?.profile === "session" ? (
+                          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
+                            Click to activate
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="mt-1 text-sm leading-6 text-slate-400">
+                        Privacy-first profile for temporary document memory.
+                        Original files are not stored. Full in-memory adapter
+                        hardening comes next.
+                      </p>
+                    </button>
                   </div>
+
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                          Storage layers
+                        </p>
+                        <p className="mt-1 text-sm text-slate-400">
+                          These layer-level controls are locked in Phase 2B.
+                          They become editable when Supabase, AWS, SQLite, and
+                          export/import adapters are implemented.
+                        </p>
+                      </div>
+
+                      <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">
+                        Layer controls locked
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3">
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                          Original file storage
+                        </span>
+                        <select
+                          value={ragConfig?.originalFileStorage ?? "none"}
+                          disabled
+                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
+                        >
+                          <option value="none">
+                            Off — original files are not stored
+                          </option>
+                        </select>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Locked for privacy. Original file storage will require
+                          explicit opt-in.
+                        </p>
+                      </label>
+
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                          Metadata storage
+                        </span>
+                        <select
+                          value={ragConfig?.metadataStorage ?? "local-json"}
+                          disabled
+                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
+                        >
+                          <option value="local-json">Local JSON</option>
+                          <option value="memory">Memory</option>
+                          <option value="supabase-postgres">
+                            Supabase Postgres — coming soon
+                          </option>
+                          <option value="aws-dynamodb">
+                            AWS DynamoDB — coming soon
+                          </option>
+                        </select>
+                      </label>
+
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                          Vector storage
+                        </span>
+                        <select
+                          value={ragConfig?.vectorStorage ?? "local-json"}
+                          disabled
+                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
+                        >
+                          <option value="local-json">Local JSON</option>
+                          <option value="memory">Memory</option>
+                          <option value="supabase-pgvector">
+                            Supabase pgvector — coming soon
+                          </option>
+                          <option value="aws-aurora">
+                            AWS Aurora pgvector — coming soon
+                          </option>
+                          <option value="aws-opensearch">
+                            AWS OpenSearch — enterprise only
+                          </option>
+                        </select>
+                      </label>
+
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                          History storage
+                        </span>
+                        <select
+                          value={ragConfig?.historyStorage ?? "browser-local"}
+                          disabled
+                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
+                        >
+                          <option value="browser-local">
+                            Browser local history
+                          </option>
+                          <option value="local-json">
+                            Local JSON — coming soon
+                          </option>
+                          <option value="supabase-postgres">
+                            Supabase Postgres — coming soon
+                          </option>
+                          <option value="aws">AWS — coming soon</option>
+                        </select>
+                      </label>
+
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                          Embedding model
+                        </span>
+                        <select
+                          value={
+                            ragConfig?.embeddingModel ??
+                            "text-embedding-3-small"
+                          }
+                          disabled
+                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
+                        >
+                          <option value="text-embedding-3-small">
+                            OpenAI text-embedding-3-small
+                          </option>
+                        </select>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Changing embedding model later will require
+                          re-indexing existing documents.
+                        </p>
+                      </label>
+                    </div>
+                  </div>
+
+                  {disabledProfiles.length ? (
+                    <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        Coming later
+                      </p>
+
+                      <div className="mt-3 space-y-2">
+                        {disabledProfiles.map((item) => (
+                          <div
+                            key={item.profile}
+                            className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <p className="text-sm font-semibold text-slate-200">
+                                {item.label}
+                              </p>
+                              <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                Disabled
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">
+                              {item.reason}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={handleClearDocumentMemory}
+                    className="w-full rounded-2xl border border-rose-300/30 bg-rose-300/10 px-4 py-3 text-sm font-semibold text-rose-100 transition hover:bg-rose-300/20"
+                  >
+                    Clear all local document memory
+                  </button>
                 </div>
               </div>
             </section>
@@ -696,7 +1146,9 @@ export default function DocSearchPage() {
                   disabled={querying || !selectedDocumentIds.length}
                   className="mt-5 w-full rounded-2xl bg-emerald-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {querying ? "Searching documents..." : "Ask selected documents"}
+                  {querying
+                    ? "Searching documents..."
+                    : "Ask selected documents"}
                 </button>
               </div>
 

@@ -17,6 +17,7 @@ export interface VectorStoreAdapter {
   ): Promise<StoredDocumentChunk[]>;
   searchSimilar(input: VectorSearchInput): Promise<VectorSearchResult[]>;
   deleteDocument(userId: string, documentId: string): Promise<void>;
+  clearUserMemory(userId: string): Promise<void>;
 }
 
 export function cosineSimilarity(left: number[], right: number[]) {
