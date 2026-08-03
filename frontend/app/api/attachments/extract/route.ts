@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+
+type PdfParseResult = {
+  text?: string;
+  numpages?: number;
+};
+
+type PdfParseFunction = (buffer: Buffer) => Promise<PdfParseResult>;
 
 type AttachmentKind = "pdf" | "docx" | "text" | "csv" | "image" | "unknown";
 
@@ -118,18 +124,18 @@ function truncateText(text: string, maxChars: number) {
 }
 
 async function extractPdfText(buffer: Buffer) {
-  const parser = new PDFParse({ data: buffer });
+  const pdfParseModule = await import("pdf-parse/lib/pdf-parse.js");
 
-  try {
-    const result = await parser.getText();
+  const pdfParse = (
+    pdfParseModule.default ?? pdfParseModule
+  ) as PdfParseFunction;
 
-    return {
-      text: result.text ?? "",
-      pageCount: result.total ?? undefined,
-    };
-  } finally {
-    await parser.destroy();
-  }
+  const result = await pdfParse(buffer);
+
+  return {
+    text: result.text ?? "",
+    pageCount: result.numpages ?? undefined,
+  };
 }
 
 async function extractDocxText(buffer: Buffer) {
@@ -137,7 +143,9 @@ async function extractDocxText(buffer: Buffer) {
 
   return {
     text: result.value ?? "",
-    warnings: result.messages?.map((message: { message: string }) => message.message) ?? [],
+    warnings:
+      result.messages?.map((message: { message: string }) => message.message) ??
+      [],
   };
 }
 
@@ -147,7 +155,6 @@ function buildCsvPreview(text: string) {
 
   return lines.slice(0, maxLines).join("\n");
 }
-
 export async function POST(request: Request) {
   const requestId = `att-${crypto.randomUUID()}`;
   const maxBytes = numberFromEnv("MAX_ATTACHMENT_BYTES", 10 * 1024 * 1024);

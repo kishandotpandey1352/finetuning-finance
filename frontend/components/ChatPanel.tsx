@@ -191,9 +191,11 @@ export function ChatPanel({
   useEffect(() => {
     setPrompt(taskCopy[task].defaultPrompt);
     setContext(taskCopy[task].defaultContext);
+    setAttachments([]);
+    setAttachmentError(null);
     setResponse(null);
     setError(null);
-  }, [task]);
+}, [task]);
 
   useEffect(() => {
     setTemperature(provider.defaultTemperature);
@@ -232,6 +234,13 @@ export function ChatPanel({
       }
 
       const attachment = payload.attachment;
+      
+      if (!attachment.text?.trim() && attachment.kind !== "image") {
+        setAttachmentError(
+          `${attachment.name} was uploaded, but no text could be extracted.`,
+        );
+      }
+
       setAttachments((current) => [...current, attachment]);
 
       const attachmentContext = buildAttachmentContext(attachment);
@@ -435,7 +444,7 @@ function handleClearAttachments() {
                     onClick={() => handleRemoveAttachment(attachment.id)}
                     className="text-xs font-semibold text-slate-400 transition hover:text-rose-200"
                   >
-                    Remove
+                    Remove chip
                   </button>
                 </div>
               ))}
