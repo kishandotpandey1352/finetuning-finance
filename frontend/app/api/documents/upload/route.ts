@@ -15,6 +15,8 @@ import type {
   StoredDocumentVector,
 } from "@/lib/server/documents/types";
 
+import { writeRagAuditEvent } from "@/lib/server/documents/audit";
+import { readRagConfig } from "@/lib/server/documents/config";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -47,7 +49,8 @@ export async function POST(request: Request) {
   const requestId = `rag-upload-${crypto.randomUUID()}`;
   const userId = getUserId(request);
   const maxIndexedChars = numberFromEnv("DOCUMENT_MAX_INDEXED_CHARS", 300000);
-
+  const config = await readRagConfig();
+  
   try {
     const formData = await request.formData();
     const fileValue = formData.get("file");
@@ -187,6 +190,20 @@ export async function POST(request: Request) {
         timestamp: new Date().toISOString(),
       }),
     );
+
+    await writeRagAuditEvent({
+  userId,
+  eventType: "document_indexed",
+  documentId: document.id,
+  fileName: document.fileName,
+  embeddingModel: document.embeddingModel,
+  metadata: {
+    chunkCount: chunks.length,
+    extractedChars: document.extractedChars,
+    fileType: document.fileType,
+    storageProfile: config.profile,
+  },
+});
 
     return NextResponse.json({
       ok: true,

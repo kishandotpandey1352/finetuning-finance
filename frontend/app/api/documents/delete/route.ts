@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getConfiguredVectorStore } from "@/lib/server/documents/store-factory";
-
+import { writeRagAuditEvent } from "@/lib/server/documents/audit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -30,6 +30,15 @@ export async function DELETE(request: Request) {
     const store = await getConfiguredVectorStore();
 
     await store.deleteDocument(userId, documentId);
+
+    await writeRagAuditEvent({
+      userId,
+      eventType: "document_deleted",
+      documentId,
+      metadata: {
+        cascadeDeleteExpected: true,
+      },
+  });
 
     console.info(
       JSON.stringify({

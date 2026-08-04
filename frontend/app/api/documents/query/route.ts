@@ -4,6 +4,9 @@ import { createEmbedding } from "@/lib/server/documents/embeddings";
 import { getConfiguredVectorStore } from "@/lib/server/documents/store-factory";
 import type { DocumentTask, RetrievedSource } from "@/lib/server/documents/types";
 import { runPremiumInference, validatePremiumInput } from "@/app/api/premium/router";
+import { writeRagAuditEvent } from "@/lib/server/documents/audit";
+import { readRagConfig } from "@/lib/server/documents/config";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,6 +90,8 @@ export async function POST(request: Request) {
     const question = body.question?.trim();
     const task = body.task ?? "qa";
     const providerId = body.providerId ?? "openai-premium";
+    const documentIds = body.documentIds;
+    const ragConfig = await readRagConfig();
 
     if (!question) {
       return NextResponse.json(
@@ -105,7 +110,7 @@ export async function POST(request: Request) {
     const store = await getVectorStore();
     const searchResults = await store.searchSimilar({
       userId,
-      documentIds: body.documentIds,
+      documentIds,
       queryEmbedding: queryEmbedding.embedding,
       topK,
     });
@@ -120,7 +125,21 @@ export async function POST(request: Request) {
       snippet: toSnippet(result.chunk.text),
     }));
 
+    
+
     const bestScore = sources[0]?.score ?? 0;
+   await writeRagAuditEvent({
+      userId,
+      eventType: "document_queried",
+      embeddingModel: ragConfig.embeddingModel,
+      metadata: {
+        queryLength: question.length,
+        sourceCount: sources.length,
+        bestScore,
+        selectedDocumentCount: documentIds?.length ?? 0,
+      },
+});
+  
 
     if (bestScore < 0.3) {
       console.warn(
@@ -178,6 +197,7 @@ export async function POST(request: Request) {
         timestamp: new Date().toISOString(),
       }),
     );
+    
 
     return NextResponse.json({
       ok: true,
