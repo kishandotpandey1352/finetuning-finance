@@ -180,7 +180,7 @@ function HistoryMetadata({ entry }: { entry: HistoryEntry }) {
         <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
           <span className="text-slate-400">Model</span>
           <span className="max-w-[60%] truncate text-right font-semibold text-white">
-            {entry.model_id ?? "Unknown"}
+            {entry.modelId ?? "Unknown"}
           </span>
         </div>
 
@@ -325,7 +325,7 @@ export default function HistoryPage() {
                       </div>
 
                       <h2 className="mt-2 truncate text-lg font-semibold text-white">
-                        {entry.provider} · {entry.model_id ?? "Unknown model"}
+                        {entry.provider} · {entry.modelId ?? "Unknown model"}
                       </h2>
 
                       <p className="mt-1 text-sm text-slate-400">
