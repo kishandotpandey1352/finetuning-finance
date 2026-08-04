@@ -103,7 +103,7 @@ const providerOptions = [
   {
     id: "openai-premium",
     name: "OpenAI Premium",
-    description: "Recommended for Phase 2A/2B RAG testing.",
+    description: "Recommended for document-grounded finance analysis.",
   },
   {
     id: "claude-premium",
@@ -139,7 +139,6 @@ const taskOptions: Array<{
   },
 ];
 
-
 function formatFileSize(size: number) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
@@ -166,9 +165,9 @@ function formatDate(value: string) {
   }
 }
 
-function profileLabel(profile?: DocumentStorageProfile) {
+function profileLabel(profile?: DocumentStorageProfile | null) {
   if (profile === "session") return "Session only";
-  if (profile === "local-json") return "Local project storage";
+  if (profile === "local-json") return "Local project";
   if (profile === "local-sqlite") return "Local SQLite";
   if (profile === "supabase-pgvector") return "Supabase pgvector";
   if (profile === "aws") return "AWS";
@@ -178,9 +177,7 @@ function profileLabel(profile?: DocumentStorageProfile) {
 
 export default function DocSearchPage() {
   const router = useRouter();
-  const configRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
 
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [documents, setDocuments] = useState<StoredDocument[]>([]);
@@ -210,8 +207,9 @@ export default function DocSearchPage() {
     [],
   );
   const [savingConfig, setSavingConfig] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [pendingProfile, setPendingProfile] =
-    useState<DocumentStorageProfile | null>(null);
+    useState<DocumentStorageProfile>("local-json");
 
   const selectedDocuments = useMemo(
     () =>
@@ -234,6 +232,23 @@ export default function DocSearchPage() {
     void loadDocuments();
     void loadRagConfig();
   }, []);
+
+  useEffect(() => {
+    if (!isConfigOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPendingProfile(ragConfig?.profile ?? "local-json");
+        setIsConfigOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isConfigOpen, ragConfig?.profile]);
 
   async function loadDocuments() {
     setLoadingDocuments(true);
@@ -285,6 +300,7 @@ export default function DocSearchPage() {
       }
 
       setRagConfig(payload.config);
+      setPendingProfile(payload.config.profile);
       setDisabledProfiles(payload.disabledProfiles ?? []);
     } catch (configError) {
       setError(
@@ -295,11 +311,9 @@ export default function DocSearchPage() {
     }
   }
 
-  function scrollToConfig() {
-    configRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+  function openConfigDialog() {
+    setPendingProfile(ragConfig?.profile ?? "local-json");
+    setIsConfigOpen(true);
   }
 
   async function handleChangeStorageProfile(profile: DocumentStorageProfile) {
@@ -312,7 +326,7 @@ export default function DocSearchPage() {
     setPendingProfile(profile);
     setError(null);
     setStatusMessage(
-      `Switching RAG storage profile to ${profileLabel(profile)}...`,
+      `Switching document memory to ${profileLabel(profile)}...`,
     );
 
     try {
@@ -331,17 +345,16 @@ export default function DocSearchPage() {
       }
 
       setRagConfig(payload.config);
+      setPendingProfile(payload.config.profile);
 
       const warnings = Array.isArray(payload.warnings) ? payload.warnings : [];
 
       setStatusMessage(
         warnings.length
-          ? `RAG configuration updated to ${profileLabel(
+          ? `Storage updated to ${profileLabel(
               payload.config.profile,
             )}. ${warnings.join(" ")}`
-          : `RAG configuration updated to ${profileLabel(
-              payload.config.profile,
-            )}.`,
+          : `Storage updated to ${profileLabel(payload.config.profile)}.`,
       );
 
       await loadDocuments();
@@ -353,13 +366,17 @@ export default function DocSearchPage() {
       );
     } finally {
       setSavingConfig(false);
-      setPendingProfile(null);
     }
+  }
+
+  async function handleSaveConfigDialog() {
+    await handleChangeStorageProfile(pendingProfile);
+    setIsConfigOpen(false);
   }
 
   async function handleClearDocumentMemory() {
     const confirmed = window.confirm(
-      "Clear all local document memory for this user? This removes indexed documents, chunks, and vectors. Original files are not stored.",
+      "Clear all document memory for this user? This removes indexed documents, chunks, and vectors. Original files are not stored.",
     );
 
     if (!confirmed) return;
@@ -382,7 +399,8 @@ export default function DocSearchPage() {
       setSelectedDocumentIds([]);
       setAnswer(null);
       setSources([]);
-      setStatusMessage("All local document memory was cleared.");
+      clearSelectedFile();
+      setStatusMessage("All document memory was cleared.");
     } catch (clearError) {
       setError(
         clearError instanceof Error
@@ -404,13 +422,6 @@ export default function DocSearchPage() {
     setError(null);
     setStatusMessage(null);
   }
-  // function clearSelectedFile() {
-  //   setSelectedFile(null);
-
-  //   if (fileInputRef.current) {
-  //     fileInputRef.current.value = "";
-  //   }
-  // }
 
   function toggleDocument(documentId: string) {
     setSelectedDocumentIds((current) =>
@@ -453,7 +464,6 @@ export default function DocSearchPage() {
         `${indexedDocument.fileName} indexed with ${indexedDocument.chunkCount} chunks and ${payload.vectorsIndexed} vectors.`,
       );
 
-      setSelectedFile(null);
       setSelectedDocumentIds((current) => [
         indexedDocument.id,
         ...current.filter((id) => id !== indexedDocument.id),
@@ -478,7 +488,7 @@ export default function DocSearchPage() {
     const confirmed = window.confirm(
       `Delete ${
         target?.fileName ?? "this document"
-      } from local document memory? This removes metadata, chunks, and vectors.`,
+      } from document memory? This removes metadata, chunks, and vectors.`,
     );
 
     if (!confirmed) return;
@@ -506,8 +516,7 @@ export default function DocSearchPage() {
       );
 
       clearSelectedFile();
-
-      setStatusMessage("Document memory deleted locally.");
+      setStatusMessage("Document memory deleted.");
       await loadDocuments();
     } catch (deleteError) {
       setError(
@@ -516,8 +525,6 @@ export default function DocSearchPage() {
           : "Document deletion failed.",
       );
     }
-
-    
   }
 
   async function handleAskQuestion() {
@@ -596,493 +603,199 @@ export default function DocSearchPage() {
           onLogout={handleLogout}
         />
 
-        <div className="space-y-6">
-          <section className="soft-panel flex flex-wrap items-center justify-between gap-4 p-6 sm:p-8">
-            <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-emerald-200/70">
-                Doc Intelligent Search
-              </p>
-              <h1 className="mt-2 text-3xl font-semibold text-white">
-                Ask repeated questions over indexed finance documents
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
-                Upload and index documents once, then query selected files using
-                chunking, embeddings, local vector search, retrieved sources,
-                and your configured premium model.
-              </p>
+        <div className="mx-auto w-full max-w-7xl space-y-4 px-3 pb-8">
+          <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-5 shadow-xl shadow-black/20">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-xs uppercase tracking-[0.24em] text-emerald-200/70">
+                  Doc Intelligent Search
+                </p>
 
-              <div className="mt-4 flex flex-wrap gap-3 text-xs">
-                <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 font-semibold text-emerald-100">
-                  RAG active
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-                  Storage: {profileLabel(ragConfig?.profile)}
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-                  Original files: not stored
-                </span>
+                <h1 className="mt-2 text-2xl font-semibold text-white">
+                  Search and analyze finance documents
+                </h1>
+
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  Upload reports, statements, PDFs, and CSVs. Ask grounded
+                  questions using vector search, retrieved source snippets, and
+                  provider-routed premium models.
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 font-semibold text-emerald-100">
+                    RAG active
+                  </span>
+
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
+                    {profileLabel(ragConfig?.profile)}
+                  </span>
+
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
+                    Files not stored
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={scrollToConfig}
-                className="rounded-2xl border border-lime-300/20 bg-lime-300/10 px-4 py-3 text-sm font-medium text-lime-50 transition hover:border-lime-200/40 hover:bg-lime-300/20"
-              >
-                RAG Configuration
-              </button>
+              <div className="flex shrink-0 gap-3">
+                <button
+                  type="button"
+                  onClick={openConfigDialog}
+                  className="rounded-xl border border-lime-300/20 bg-lime-300/10 px-4 py-2.5 text-sm font-semibold text-lime-50 transition hover:border-lime-200/40 hover:bg-lime-300/20"
+                >
+                  Configure
+                </button>
 
-              <button
-                type="button"
-                onClick={loadDocuments}
-                disabled={loadingDocuments}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loadingDocuments ? "Refreshing..." : "Refresh documents"}
-              </button>
+                <button
+                  type="button"
+                  onClick={loadDocuments}
+                  disabled={loadingDocuments}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loadingDocuments ? "Refreshing..." : "Refresh"}
+                </button>
+              </div>
             </div>
           </section>
 
           {error ? (
-            <div className="rounded-3xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm text-rose-100">
+            <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">
               {error}
             </div>
           ) : null}
 
           {statusMessage ? (
-            <div className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm text-cyan-100">
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm text-cyan-100">
               {statusMessage}
             </div>
           ) : null}
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
-            <section className="space-y-6">
-              <div className="soft-panel p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.22em] text-cyan-200/70">
-                      Document library
-                    </p>
-                    <h2 className="mt-2 text-xl font-semibold text-white">
-                      Upload and index
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Phase 2A stores metadata, chunks, and embedding vectors in
-                      local project storage. Original files are not persisted.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-3xl border border-dashed border-white/15 bg-black/20 p-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.docx,.txt,.md,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv"
-                    onChange={handleFileChange}
-                    className="block w-full text-sm text-slate-300 file:mr-4 file:rounded-2xl file:border-0 file:bg-cyan-300/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-cyan-100 hover:file:bg-cyan-300/20"
-                  />
-
-                  {selectedFile ? (
-                    <p className="mt-3 text-xs text-slate-400">
-                      Selected:{" "}
-                      <span className="font-semibold text-slate-200">
-                        {selectedFile.name}
-                      </span>{" "}
-                      · {formatFileSize(selectedFile.size)}
-                    </p>
-                  ) : null}
-
-                  <button
-                    type="button"
-                    onClick={handleUploadAndIndex}
-                    disabled={indexing || !selectedFile}
-                    className="mt-4 w-full rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {indexing ? "Indexing document..." : "Upload and index"}
-                  </button>
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  {documents.length ? (
-                    documents.map((document) => {
-                      const selected = selectedDocumentIds.includes(
-                        document.id,
-                      );
-
-                      return (
-                        <div
-                          key={document.id}
-                          className={`rounded-3xl border p-4 transition ${
-                            selected
-                              ? "border-emerald-300/30 bg-emerald-300/10"
-                              : "border-white/10 bg-black/20"
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => toggleDocument(document.id)}
-                              className="mt-1 h-4 w-4 rounded border-white/20 bg-black"
-                            />
-
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-white">
-                                {document.fileName}
-                              </p>
-
-                              <p className="mt-1 text-xs leading-5 text-slate-400">
-                                {formatKind(document.kind)} ·{" "}
-                                {formatFileSize(document.size)} ·{" "}
-                                {document.chunkCount} chunks ·{" "}
-                                {document.extractedChars.toLocaleString()} chars
-                                {document.pageCount
-                                  ? ` · ${document.pageCount} pages`
-                                  : ""}
-                              </p>
-
-                              <p className="mt-1 text-xs text-slate-500">
-                                {document.embeddingModel} ·{" "}
-                                {formatDate(document.createdAt)}
-                              </p>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteDocument(document.id)}
-                              className="rounded-xl border border-white/10 px-3 py-1 text-xs font-medium text-slate-400 transition hover:border-rose-300/30 hover:bg-rose-300/10 hover:text-rose-100"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-sm text-slate-400">
-                      No indexed documents yet. Upload a document to create
-                      local chunks and embeddings.
-                    </div>
-                  )}
+          <div className="grid gap-4 lg:grid-cols-[390px_minmax(0,1fr)]">
+            <section className="rounded-3xl border border-white/10 bg-slate-950/75 p-4 shadow-xl shadow-black/15">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/70">
+                    Document Library
+                  </p>
+                  <h2 className="mt-2 text-lg font-semibold text-white">
+                    Upload and index
+                  </h2>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Stores chunks and vectors in the selected memory profile.
+                    Original files are not persisted.
+                  </p>
                 </div>
               </div>
 
-              <div ref={configRef} className="soft-panel p-6 scroll-mt-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.22em] text-lime-200/70">
-                      RAG Configuration
-                    </p>
-                    <h2 className="mt-2 text-xl font-semibold text-white">
-                      Storage profile
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Phase 2B lets users choose safe storage profiles. Cloud
-                      adapters are visible but disabled until Phase 2C.
-                    </p>
-                  </div>
+              <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.txt,.md,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv"
+                  onChange={handleFileChange}
+                  className="block w-full text-xs text-slate-300 file:mr-3 file:rounded-xl file:border-0 file:bg-cyan-300/10 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-cyan-100 hover:file:bg-cyan-300/20"
+                />
 
-                  <span className="rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-lime-100">
-                    {ragConfig?.profile ?? "loading"}
-                  </span>
-                </div>
+                {selectedFile ? (
+                  <p className="mt-2 truncate text-xs text-slate-400">
+                    <span className="font-semibold text-slate-200">
+                      {selectedFile.name}
+                    </span>{" "}
+                    · {formatFileSize(selectedFile.size)}
+                  </p>
+                ) : null}
 
-                <div className="mt-5 space-y-5">
-                  <div className="rounded-3xl border border-lime-300/20 bg-lime-300/10 p-4">
-                    <label className="block">
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-100/80">
-                        Editable now
-                      </span>
+                <button
+                  type="button"
+                  onClick={handleUploadAndIndex}
+                  disabled={indexing || !selectedFile}
+                  className="mt-3 w-full rounded-xl bg-cyan-300 px-3 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {indexing ? "Indexing..." : "Upload and index"}
+                </button>
+              </div>
 
-                      <p className="mt-2 text-sm leading-6 text-slate-300">
-                        Choose where Phase 2B document memory should live.
-                        Cloud and BYO storage options stay locked until their
-                        adapters are implemented.
-                      </p>
+              <div className="mt-4 space-y-2">
+                {documents.length ? (
+                  documents.map((document) => {
+                    const selected = selectedDocumentIds.includes(document.id);
 
-                      <select
-                        value={ragConfig?.profile ?? "local-json"}
-                        disabled={savingConfig}
-                        onChange={(event) =>
-                          handleChangeStorageProfile(
-                            event.target.value as DocumentStorageProfile,
-                          )
-                        }
-                        className="mt-4 w-full rounded-2xl border border-lime-300/25 bg-black/40 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-lime-200/60 disabled:cursor-not-allowed disabled:opacity-60"
+                    return (
+                      <div
+                        key={document.id}
+                        className={`rounded-2xl border p-3 transition ${
+                          selected
+                            ? "border-emerald-300/30 bg-emerald-300/10"
+                            : "border-white/10 bg-black/20 hover:border-white/20"
+                        }`}
                       >
-                        <option value="local-json">Local project storage</option>
-                        <option value="session">Session only</option>
-                        <option value="supabase-pgvector">Supabase pgvector</option>
-                      </select>
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleDocument(document.id)}
+                            className="mt-1 h-4 w-4 rounded border-white/20 bg-black"
+                          />
 
-                      {savingConfig ? (
-                        <p className="mt-2 text-xs text-lime-100">
-                          Saving{" "}
-                          {pendingProfile
-                            ? profileLabel(pendingProfile)
-                            : "configuration"}
-                          ...
-                        </p>
-                      ) : null}
-                    </label>
-                  </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-white">
+                              {document.fileName}
+                            </p>
 
-                  <div className="grid gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleChangeStorageProfile("local-json")}
-                      disabled={savingConfig}
-                      className={[
-                        "rounded-3xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
-                        ragConfig?.profile === "local-json"
-                          ? "border-lime-300/40 bg-lime-300/10"
-                          : "border-white/10 bg-black/20 hover:border-lime-300/25 hover:bg-lime-300/5",
-                      ].join(" ")}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="font-semibold text-white">
-                          Local project storage
-                        </p>
-                        {ragConfig?.profile === "local-json" ? (
-                          <span className="rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-100">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
-                            Click to activate
-                          </span>
-                        )}
-                      </div>
+                            <p className="mt-1 text-[11px] leading-5 text-slate-400">
+                              {formatKind(document.kind)} ·{" "}
+                              {formatFileSize(document.size)} ·{" "}
+                              {document.chunkCount} chunks
+                              {document.pageCount
+                                ? ` · ${document.pageCount} pages`
+                                : ""}
+                            </p>
 
-                      <p className="mt-1 text-sm leading-6 text-slate-400">
-                        Stores metadata, chunks, and vectors under{" "}
-                        <code className="rounded bg-black/40 px-1 py-0.5 text-lime-100">
-                          frontend/.data/document-memory
-                        </code>
-                        . Original files remain off.
-                      </p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleChangeStorageProfile("session")}
-                      disabled={savingConfig}
-                      className={[
-                        "rounded-3xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
-                        ragConfig?.profile === "session"
-                          ? "border-cyan-300/40 bg-cyan-300/10"
-                          : "border-white/10 bg-black/20 hover:border-cyan-300/25 hover:bg-cyan-300/5",
-                      ].join(" ")}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="font-semibold text-white">
-                          Session only
-                        </p>
-                        {ragConfig?.profile === "session" ? (
-                          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
-                            Click to activate
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="mt-1 text-sm leading-6 text-slate-400">
-                        Privacy-first profile for temporary document memory.
-                        Original files are not stored. Full in-memory adapter
-                        hardening comes next.
-                      </p>
-                    </button>
-                  </div>
-
-                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                          Storage layers
-                        </p>
-                        <p className="mt-1 text-sm text-slate-400">
-                          These layer-level controls are locked in Phase 2B.
-                          They become editable when Supabase, AWS, SQLite, and
-                          export/import adapters are implemented.
-                        </p>
-                      </div>
-
-                      <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">
-                        Layer controls locked
-                      </span>
-                    </div>
-
-                    <div className="mt-4 grid gap-3">
-                      <label className="block">
-                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                          Original file storage
-                        </span>
-                        <select
-                          value={ragConfig?.originalFileStorage ?? "none"}
-                          disabled
-                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
-                        >
-                          <option value="none">
-                            Off — original files are not stored
-                          </option>
-                        </select>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Locked for privacy. Original file storage will require
-                          explicit opt-in.
-                        </p>
-                      </label>
-
-                      <label className="block">
-                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                          Metadata storage
-                        </span>
-                        <select
-                          value={ragConfig?.metadataStorage ?? "local-json"}
-                          disabled
-                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
-                        >
-                          <option value="local-json">Local JSON</option>
-                          <option value="memory">Memory</option>
-                          <option value="supabase-postgres">
-                            Supabase Postgres — coming soon
-                          </option>
-                          <option value="aws-dynamodb">
-                            AWS DynamoDB — coming soon
-                          </option>
-                        </select>
-                      </label>
-
-                      <label className="block">
-                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                          Vector storage
-                        </span>
-                        <select
-                          value={ragConfig?.vectorStorage ?? "local-json"}
-                          disabled
-                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
-                        >
-                          <option value="local-json">Local JSON</option>
-                          <option value="memory">Memory</option>
-                          <option value="supabase-pgvector">
-                            Supabase pgvector — coming soon
-                          </option>
-                          <option value="aws-aurora">
-                            AWS Aurora pgvector — coming soon
-                          </option>
-                          <option value="aws-opensearch">
-                            AWS OpenSearch — enterprise only
-                          </option>
-                        </select>
-                      </label>
-
-                      <label className="block">
-                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                          History storage
-                        </span>
-                        <select
-                          value={ragConfig?.historyStorage ?? "browser-local"}
-                          disabled
-                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
-                        >
-                          <option value="browser-local">
-                            Browser local history
-                          </option>
-                          <option value="local-json">
-                            Local JSON — coming soon
-                          </option>
-                          <option value="supabase-postgres">
-                            Supabase Postgres — coming soon
-                          </option>
-                          <option value="aws">AWS — coming soon</option>
-                        </select>
-                      </label>
-
-                      <label className="block">
-                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                          Embedding model
-                        </span>
-                        <select
-                          value={
-                            ragConfig?.embeddingModel ??
-                            "text-embedding-3-small"
-                          }
-                          disabled
-                          className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-slate-500 outline-none"
-                        >
-                          <option value="text-embedding-3-small">
-                            OpenAI text-embedding-3-small
-                          </option>
-                        </select>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Changing embedding model later will require
-                          re-indexing existing documents.
-                        </p>
-                      </label>
-                    </div>
-                  </div>
-
-                  {disabledProfiles.length ? (
-                    <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                        Coming later
-                      </p>
-
-                      <div className="mt-3 space-y-2">
-                        {disabledProfiles.map((item) => (
-                          <div
-                            key={item.profile}
-                            className="rounded-2xl border border-white/10 bg-white/5 p-3"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <p className="text-sm font-semibold text-slate-200">
-                                {item.label}
-                              </p>
-                              <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                                Disabled
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">
-                              {item.reason}
+                            <p className="mt-1 truncate text-[11px] text-slate-500">
+                              {profileLabel(
+                                document.storageProfile as DocumentStorageProfile,
+                              )}{" "}
+                              · {formatDate(document.createdAt)}
                             </p>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
 
-                  <button
-                    type="button"
-                    onClick={handleClearDocumentMemory}
-                    className="w-full rounded-2xl border border-rose-300/30 bg-rose-300/10 px-4 py-3 text-sm font-semibold text-rose-100 transition hover:bg-rose-300/20"
-                  >
-                    Clear all local document memory
-                  </button>
-                </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDocument(document.id)}
+                            className="rounded-lg border border-white/10 px-2.5 py-1 text-[11px] font-medium text-slate-400 transition hover:border-rose-300/30 hover:bg-rose-300/10 hover:text-rose-100"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-400">
+                    No indexed documents yet. Upload a document to create
+                    chunks and embeddings.
+                  </div>
+                )}
               </div>
             </section>
 
-            <section className="space-y-6">
-              <div className="soft-panel p-6">
-                <p className="text-xs uppercase tracking-[0.22em] text-emerald-200/70">
-                  Ask documents
+            <section className="space-y-4">
+              <div className="rounded-3xl border border-white/10 bg-slate-950/75 p-4 shadow-xl shadow-black/15">
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/70">
+                  Ask Documents
                 </p>
-                <h2 className="mt-2 text-xl font-semibold text-white">
-                  Query selected document memory
+                <h2 className="mt-2 text-lg font-semibold text-white">
+                  Query selected memory
                 </h2>
 
-                <div className="mt-5 grid gap-4 md:grid-cols-3">
-                  <label className="space-y-2">
-                    <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_120px]">
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
                       Provider
                     </span>
                     <select
                       value={providerId}
                       onChange={(event) => setProviderId(event.target.value)}
-                      className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/40"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cyan-300/40"
                     >
                       {providerOptions.map((provider) => (
                         <option key={provider.id} value={provider.id}>
@@ -1092,8 +805,8 @@ export default function DocSearchPage() {
                     </select>
                   </label>
 
-                  <label className="space-y-2">
-                    <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
                       Task
                     </span>
                     <select
@@ -1101,7 +814,7 @@ export default function DocSearchPage() {
                       onChange={(event) =>
                         setTask(event.target.value as FinanceTask)
                       }
-                      className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/40"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cyan-300/40"
                     >
                       {taskOptions.map((item) => (
                         <option key={item.id} value={item.id}>
@@ -1111,9 +824,9 @@ export default function DocSearchPage() {
                     </select>
                   </label>
 
-                  <label className="space-y-2">
-                    <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                      Top-K sources
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                      Top-K
                     </span>
                     <input
                       type="number"
@@ -1123,34 +836,34 @@ export default function DocSearchPage() {
                       onChange={(event) =>
                         setTopK(Number(event.target.value) || 6)
                       }
-                      className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/40"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cyan-300/40"
                     />
                   </label>
                 </div>
 
-                <label className="mt-5 block space-y-2">
-                  <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                <label className="mt-4 block space-y-1.5">
+                  <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
                     Question
                   </span>
                   <textarea
                     value={question}
                     onChange={(event) => setQuestion(event.target.value)}
-                    rows={6}
-                    className="w-full rounded-3xl border border-white/10 bg-black/30 px-4 py-4 text-sm leading-7 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/40"
-                    placeholder="Ask a question over the selected indexed documents..."
+                    rows={4}
+                    className="w-full rounded-2xl border border-white/10 bg-black/30 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/40"
+                    placeholder="Ask a question over selected indexed documents..."
                   />
                 </label>
 
-                <div className="mt-5 rounded-3xl border border-white/10 bg-black/20 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
                     Selected documents
                   </p>
                   {selectedDocuments.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       {selectedDocuments.map((document) => (
                         <span
                           key={document.id}
-                          className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100"
+                          className="max-w-full truncate rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100"
                         >
                           {document.fileName}
                         </span>
@@ -1167,106 +880,337 @@ export default function DocSearchPage() {
                   type="button"
                   onClick={handleAskQuestion}
                   disabled={querying || !selectedDocumentIds.length}
-                  className="mt-5 w-full rounded-2xl bg-emerald-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-4 w-full rounded-xl bg-emerald-300 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {querying
-                    ? "Searching documents..."
-                    : "Ask selected documents"}
+                  {querying ? "Searching..." : "Ask selected documents"}
                 </button>
               </div>
 
-              <div className="soft-panel p-6">
-                <p className="text-xs uppercase tracking-[0.22em] text-cyan-200/70">
-                  Answer
-                </p>
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="rounded-3xl border border-white/10 bg-slate-950/75 p-4 shadow-xl shadow-black/15">
+                  <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/70">
+                    Answer
+                  </p>
 
-                {answer?.output ? (
-                  <div className="mt-4 space-y-4">
-                    <div className="rounded-3xl border border-white/10 bg-black/25 p-5">
-                      <div className="mb-4 flex flex-wrap gap-2 text-xs">
-                        {latestRequestId ? (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-                            {latestRequestId}
-                          </span>
-                        ) : null}
-                        {answer.provider ? (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-                            {answer.provider}
-                          </span>
-                        ) : null}
-                        {answer.model_id ? (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-                            {answer.model_id}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <p className="whitespace-pre-wrap text-sm leading-7 text-slate-100">
-                        {answer.output}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-3xl border border-white/10 bg-black/20 p-6 text-sm text-slate-400">
-                    Ask a question to generate a grounded answer from retrieved
-                    document chunks.
-                  </div>
-                )}
-              </div>
-
-              <div className="soft-panel p-6">
-                <p className="text-xs uppercase tracking-[0.22em] text-amber-200/70">
-                  Retrieved sources
-                </p>
-                <h2 className="mt-2 text-xl font-semibold text-white">
-                  Evidence used
-                </h2>
-
-                {sources.length ? (
-                  <div className="mt-5 space-y-3">
-                    {sources.map((source, index) => (
-                      <details
-                        key={source.chunkId}
-                        className="rounded-3xl border border-white/10 bg-black/25 p-4"
-                        open={index === 0}
-                      >
-                        <summary className="cursor-pointer list-none">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-white">
-                                Source {index + 1}: {source.fileName}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-400">
-                                Chunk {source.chunkIndex}
-                                {source.pageNumber
-                                  ? ` · page ${source.pageNumber}`
-                                  : ""}{" "}
-                                · score {source.score.toFixed(3)}
-                              </p>
-                            </div>
-
-                            <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">
-                              Retrieved
+                  {answer?.output ? (
+                    <div className="mt-3 space-y-3">
+                      <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                        <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
+                          {latestRequestId ? (
+                            <span className="max-w-full truncate rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
+                              {latestRequestId}
                             </span>
-                          </div>
-                        </summary>
+                          ) : null}
+                          {answer.provider ? (
+                            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
+                              {answer.provider}
+                            </span>
+                          ) : null}
+                          {answer.model_id ? (
+                            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
+                              {answer.model_id}
+                            </span>
+                          ) : null}
+                        </div>
 
-                        <p className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4 text-sm leading-7 text-slate-300">
-                          {source.snippet}
+                        <p className="whitespace-pre-wrap text-sm leading-6 text-slate-100">
+                          {answer.output}
                         </p>
-                      </details>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-3xl border border-white/10 bg-black/20 p-6 text-sm text-slate-400">
-                    Retrieved chunks will appear here after a document query.
-                  </div>
-                )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-slate-400">
+                      Ask a question to generate a grounded answer from
+                      retrieved document chunks.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-slate-950/75 p-4 shadow-xl shadow-black/15">
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">
+                    Retrieved Sources
+                  </p>
+                  <h2 className="mt-2 text-lg font-semibold text-white">
+                    Evidence used
+                  </h2>
+
+                  {sources.length ? (
+                    <div className="mt-3 space-y-2">
+                      {sources.map((source, index) => (
+                        <details
+                          key={source.chunkId}
+                          className="rounded-2xl border border-white/10 bg-black/25 p-3"
+                          open={index === 0}
+                        >
+                          <summary className="cursor-pointer list-none">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-white">
+                                  Source {index + 1}: {source.fileName}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-400">
+                                  Chunk {source.chunkIndex}
+                                  {source.pageNumber
+                                    ? ` · page ${source.pageNumber}`
+                                    : ""}{" "}
+                                  · score {source.score.toFixed(3)}
+                                </p>
+                              </div>
+
+                              <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[11px] font-semibold text-amber-100">
+                                Retrieved
+                              </span>
+                            </div>
+                          </summary>
+
+                          <p className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm leading-6 text-slate-300">
+                            {source.snippet}
+                          </p>
+                        </details>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-slate-400">
+                      Retrieved chunks will appear here after a document query.
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
           </div>
         </div>
       </div>
+
+      {isConfigOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-950 p-5 shadow-2xl shadow-black/60">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-lime-300/80">
+                  Configuration
+                </p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-50">
+                  Document memory
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Choose where document chunks and vectors should live.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingProfile(ragConfig?.profile ?? "local-json");
+                  setIsConfigOpen(false);
+                }}
+                className="rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-300 transition hover:border-slate-400 hover:text-white"
+              >
+                Esc
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-200">
+                  Storage profile
+                </span>
+
+                <select
+                  value={pendingProfile}
+                  onChange={(event) =>
+                    setPendingProfile(
+                      event.target.value as DocumentStorageProfile,
+                    )
+                  }
+                  disabled={savingConfig}
+                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm font-semibold text-slate-100 outline-none transition focus:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="local-json">Local project storage</option>
+                  <option value="session">Session only</option>
+                  <option value="supabase-pgvector">Supabase pgvector</option>
+                </select>
+              </label>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => setPendingProfile("local-json")}
+                  disabled={savingConfig}
+                  className={`rounded-2xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    pendingProfile === "local-json"
+                      ? "border-cyan-300/70 bg-cyan-300/10"
+                      : "border-slate-800 bg-slate-900/70 hover:border-slate-500"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-slate-100">
+                    Local
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Project-local JSON memory.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPendingProfile("session")}
+                  disabled={savingConfig}
+                  className={`rounded-2xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    pendingProfile === "session"
+                      ? "border-cyan-300/70 bg-cyan-300/10"
+                      : "border-slate-800 bg-slate-900/70 hover:border-slate-500"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-slate-100">
+                    Session
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Temporary privacy-first profile.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPendingProfile("supabase-pgvector")}
+                  disabled={savingConfig}
+                  className={`rounded-2xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    pendingProfile === "supabase-pgvector"
+                      ? "border-lime-300/70 bg-lime-300/10"
+                      : "border-slate-800 bg-slate-900/70 hover:border-slate-500"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-slate-100">
+                    Supabase
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Cloud Postgres + pgvector.
+                  </p>
+                </button>
+              </div>
+
+              <details className="rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-200">
+                  Advanced storage layers
+                </summary>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                      Original files
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {ragConfig?.originalFileStorage ?? "none"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                      Vector storage
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {ragConfig?.vectorStorage ?? "local-json"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                      Metadata storage
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {ragConfig?.metadataStorage ?? "local-json"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                      History storage
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {ragConfig?.historyStorage ?? "browser-local"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                      Embedding
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {ragConfig?.embeddingModel ?? "text-embedding-3-small"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                      Retrieval top-K
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {ragConfig?.retrievalTopK ?? 6}
+                    </p>
+                  </div>
+                </div>
+              </details>
+
+              {disabledProfiles.length ? (
+                <details className="rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-200">
+                    Coming later
+                  </summary>
+
+                  <div className="mt-3 space-y-2">
+                    {disabledProfiles.map((item) => (
+                      <div
+                        key={item.profile}
+                        className="rounded-xl border border-white/10 bg-white/5 p-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-200">
+                            {item.label}
+                          </p>
+                          <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Disabled
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          {item.reason}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={handleClearDocumentMemory}
+                className="w-full rounded-xl border border-rose-300/30 bg-rose-300/10 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-rose-300/20"
+              >
+                Clear all document memory
+              </button>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingProfile(ragConfig?.profile ?? "local-json");
+                  setIsConfigOpen(false);
+                }}
+                className="rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:border-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={savingConfig}
+                onClick={handleSaveConfigDialog}
+                className="rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingConfig ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
