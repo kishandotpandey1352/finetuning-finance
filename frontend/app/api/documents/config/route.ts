@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import {
   buildConfigForProfile,
   disabledProfiles,
-  enabledProfiles,
+  getEnabledProfiles,
   readRagConfig,
   writeRagConfig,
 } from "@/lib/server/documents/config";
@@ -22,7 +22,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     config,
-    enabledProfiles,
+    enabledProfiles: getEnabledProfiles(),
     disabledProfiles,
   });
 }

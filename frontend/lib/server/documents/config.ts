@@ -47,10 +47,15 @@ export type RagStorageConfig = {
   updatedAt: string;
 };
 
-export const enabledProfiles: DocumentStorageProfile[] = [
-  "session",
-  "local-json",
-];
+export function getEnabledProfiles(): DocumentStorageProfile[] {
+  const profiles: DocumentStorageProfile[] = ["session", "local-json"];
+
+  if (process.env.DOCUMENT_ENABLE_SUPABASE === "true") {
+    profiles.push("supabase-pgvector");
+  }
+
+  return profiles;
+}
 
 export const disabledProfiles: Array<{
   profile: DocumentStorageProfile;
@@ -145,7 +150,7 @@ export function buildConfigForProfile(
   profile: DocumentStorageProfile,
   currentConfig = getDefaultRagConfig(),
 ): RagStorageConfig {
-  if (!enabledProfiles.includes(profile)) {
+  if (!getEnabledProfiles().includes(profile)) {
     throw new Error(`${profile} is not enabled in Phase 2B.`);
   }
 
@@ -161,6 +166,19 @@ export function buildConfigForProfile(
       updatedAt: new Date().toISOString(),
     };
   }
+
+  if (profile === "supabase-pgvector") {
+  return {
+    ...currentConfig,
+    profile: "supabase-pgvector",
+    originalFileStorage: "none",
+    vectorStorage: "supabase-pgvector",
+    metadataStorage: "supabase-postgres",
+    historyStorage: "browser-local",
+    storeOriginalFiles: false,
+    updatedAt: new Date().toISOString(),
+  };
+}
 
   return {
     ...currentConfig,

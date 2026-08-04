@@ -1,50 +1,70 @@
 import { NextResponse } from "next/server";
-
-import { getVectorStore } from "@/lib/server/documents/stores/local-json";
+import { getConfiguredVectorStore } from "@/lib/server/documents/store-factory";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type DeleteBody = {
-  documentId?: string;
-};
 
 function getUserId(request: Request) {
   return request.headers.get("x-user-id") ?? "local-demo-user";
 }
 
 export async function DELETE(request: Request) {
+  const requestId = crypto.randomUUID();
   const userId = getUserId(request);
 
   try {
-    const body = (await request.json()) as DeleteBody;
-    const documentId = body.documentId;
+    const body = await request.json().catch(() => null);
+    const documentId = body?.documentId;
 
-    if (!documentId) {
+    if (!documentId || typeof documentId !== "string") {
       return NextResponse.json(
         {
           ok: false,
           error: "documentId is required.",
+          requestId,
         },
         { status: 400 },
       );
     }
 
-    const store = getVectorStore();
+    const store = await getConfiguredVectorStore();
+
     await store.deleteDocument(userId, documentId);
+
+    console.info(
+      JSON.stringify({
+        event: "rag_document_deleted",
+        requestId,
+        userId,
+        documentId,
+        timestamp: new Date().toISOString(),
+      }),
+    );
 
     return NextResponse.json({
       ok: true,
       documentId,
+      requestId,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Document deletion failed.";
+    console.error(
+      JSON.stringify({
+        event: "rag_document_delete_failed",
+        requestId,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+      }),
+    );
 
     return NextResponse.json(
       {
         ok: false,
-        error: message,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete document.",
+        requestId,
       },
       { status: 500 },
     );

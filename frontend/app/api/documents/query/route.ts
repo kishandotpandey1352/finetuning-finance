@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createEmbedding } from "@/lib/server/documents/embeddings";
-import { getVectorStore } from "@/lib/server/documents/stores/local-json";
+import { getConfiguredVectorStore } from "@/lib/server/documents/store-factory";
 import type { DocumentTask, RetrievedSource } from "@/lib/server/documents/types";
 import { runPremiumInference, validatePremiumInput } from "@/app/api/premium/router";
 
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     const topK = body.topK ?? numberFromEnv("DOCUMENT_RETRIEVAL_TOP_K", 6);
     const queryEmbedding = await createEmbedding(question);
 
-    const store = getVectorStore();
+    const store = await getVectorStore();
     const searchResults = await store.searchSimilar({
       userId,
       documentIds: body.documentIds,
@@ -214,4 +214,8 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function getVectorStore() {
+  return getConfiguredVectorStore();
 }

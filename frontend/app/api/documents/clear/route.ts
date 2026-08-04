@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getVectorStore } from "@/lib/server/documents/stores/local-json";
-
+import { getConfiguredVectorStore } from "@/lib/server/documents/store-factory";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -13,7 +12,7 @@ export async function DELETE(request: Request) {
   const userId = getUserId(request);
 
   try {
-    const store = getVectorStore();
+    const store = await getConfiguredVectorStore();
     await store.clearUserMemory(userId);
 
     console.info(

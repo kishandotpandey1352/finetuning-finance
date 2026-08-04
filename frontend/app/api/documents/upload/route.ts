@@ -9,7 +9,7 @@ import {
   getEmbeddingModel,
 } from "@/lib/server/documents/embeddings";
 import { extractDocumentText } from "@/lib/server/documents/extract";
-import { getVectorStore } from "@/lib/server/documents/stores/local-json";
+import { getConfiguredVectorStore } from "@/lib/server/documents/store-factory";
 import type {
   StoredDocument,
   StoredDocumentVector,
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     };
 
-    const store = getVectorStore();
+    const store = await getVectorStore();
 
     await store.upsertDocument(document);
     await store.upsertChunks(chunks);
@@ -219,4 +219,8 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function getVectorStore() {
+  return getConfiguredVectorStore();
 }

@@ -139,6 +139,7 @@ const taskOptions: Array<{
   },
 ];
 
+
 function formatFileSize(size: number) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
@@ -178,6 +179,8 @@ function profileLabel(profile?: DocumentStorageProfile) {
 export default function DocSearchPage() {
   const router = useRouter();
   const configRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
 
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [documents, setDocuments] = useState<StoredDocument[]>([]);
@@ -217,6 +220,14 @@ export default function DocSearchPage() {
       ),
     [documents, selectedDocumentIds],
   );
+
+  function clearSelectedFile() {
+    setSelectedFile(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
 
   useEffect(() => {
     setAuth(loadAuth());
@@ -393,6 +404,13 @@ export default function DocSearchPage() {
     setError(null);
     setStatusMessage(null);
   }
+  // function clearSelectedFile() {
+  //   setSelectedFile(null);
+
+  //   if (fileInputRef.current) {
+  //     fileInputRef.current.value = "";
+  //   }
+  // }
 
   function toggleDocument(documentId: string) {
     setSelectedDocumentIds((current) =>
@@ -442,6 +460,7 @@ export default function DocSearchPage() {
       ]);
 
       await loadDocuments();
+      clearSelectedFile();
     } catch (uploadError) {
       setError(
         uploadError instanceof Error
@@ -486,6 +505,8 @@ export default function DocSearchPage() {
         current.filter((id) => id !== documentId),
       );
 
+      clearSelectedFile();
+
       setStatusMessage("Document memory deleted locally.");
       await loadDocuments();
     } catch (deleteError) {
@@ -495,6 +516,8 @@ export default function DocSearchPage() {
           : "Document deletion failed.",
       );
     }
+
+    
   }
 
   async function handleAskQuestion() {
@@ -653,6 +676,7 @@ export default function DocSearchPage() {
 
                 <div className="mt-5 rounded-3xl border border-dashed border-white/15 bg-black/20 p-4">
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept=".pdf,.docx,.txt,.md,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv"
                     onChange={handleFileChange}
@@ -787,10 +811,9 @@ export default function DocSearchPage() {
                         }
                         className="mt-4 w-full rounded-2xl border border-lime-300/25 bg-black/40 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-lime-200/60 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <option value="local-json">
-                          Local project storage
-                        </option>
+                        <option value="local-json">Local project storage</option>
                         <option value="session">Session only</option>
+                        <option value="supabase-pgvector">Supabase pgvector</option>
                       </select>
 
                       {savingConfig ? (
