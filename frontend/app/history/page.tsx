@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { clearAuth, getDisplayName, loadAuth } from "@/lib/auth";
 import { clearHistory, loadHistory } from "@/lib/history";
 import type { AuthState, HistoryEntry } from "@/types";
+import { AppTopMenu } from "@/components/AppTopMenu";
 
 function formatFileSize(size: number) {
   if (size < 1024) {
@@ -250,6 +251,8 @@ export default function HistoryPage() {
           mode="basic"
           onLogout={handleLogout}
         />
+        
+          <AppTopMenu />
 
         <div className="mx-auto w-full max-w-7xl space-y-4 px-3 pb-8">
           <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-5 shadow-xl shadow-black/20">

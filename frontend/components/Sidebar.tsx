@@ -35,14 +35,8 @@ const navItems = [
     label: "History",
     description: "Runs",
     accent: "emerald",
-  },
-  {
-  href: "/memory",
-  label: "Memory",
-  description: "Approved preferences",
-  accent: "cyan",
-},
-] as const;
+    },
+  ] as const;
 
 const pageThemes = {
   cyan: {

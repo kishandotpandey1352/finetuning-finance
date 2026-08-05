@@ -15,6 +15,9 @@ import type {
   ProviderOption,
 } from "@/types";
 
+import { AppTopMenu } from "@/components/AppTopMenu";
+
+
 type BackendHealth = {
   status?: string;
   service?: string;
@@ -221,6 +224,8 @@ export default function DashboardPage() {
     <main className="page-shell">
       <div className="app-grid">
         <Sidebar displayName={displayName} mode={mode} onLogout={handleLogout} />
+
+        <AppTopMenu />
 
         <div className="mx-auto w-full max-w-7xl space-y-4 px-3 pb-8">
           <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-5 shadow-xl shadow-black/20">

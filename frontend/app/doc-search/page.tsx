@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { clearAuth, getDisplayName, loadAuth } from "@/lib/auth";
 import type { AuthState, FinanceTask } from "@/types";
+import { AppTopMenu } from "@/components/AppTopMenu";
 
 type StoredDocument = {
   id: string;
@@ -602,6 +603,8 @@ export default function DocSearchPage() {
           mode="premium"
           onLogout={handleLogout}
         />
+
+        <AppTopMenu />
 
         <div className="mx-auto w-full max-w-7xl space-y-4 px-3 pb-8">
           <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-5 shadow-xl shadow-black/20">
