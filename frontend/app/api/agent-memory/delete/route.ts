@@ -4,7 +4,7 @@ import {
   getAgentServiceUrl,
   getUserId,
   parseAgentServiceResponse,
-} from "@/lib/server/agent-service";
+} from "../../../../lib/server/agent-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

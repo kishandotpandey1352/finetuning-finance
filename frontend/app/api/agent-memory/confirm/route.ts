@@ -3,32 +3,11 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function getAgentServiceUrl() {
-  const url = process.env.AGENT_SERVICE_URL;
-
-  if (!url) {
-    throw new Error("AGENT_SERVICE_URL is not configured.");
-  }
-
-  return url.replace(/\/$/, "");
-}
-
-function getUserId(request: Request) {
-  return request.headers.get("x-user-id") ?? "";
-}
-
-async function parseAgentServiceResponse(response: Response) {
-  const contentType = response.headers.get("content-type") ?? "";
-
-  if (contentType.includes("application/json")) {
-    return response.json();
-  }
-
-  return {
-    ok: response.ok,
-    message: await response.text(),
-  };
-}
+import {
+  getAgentServiceUrl,
+  getUserId,
+  parseAgentServiceResponse,
+} from "@/lib/server/agent-service";
 
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
