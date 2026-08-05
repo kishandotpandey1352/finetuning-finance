@@ -263,6 +263,7 @@ export function ChatPanel({
   const [memorySuggestion, setMemorySuggestion] = useState<MemorySuggestion | null>(null);
   const [savingMemorySuggestion, setSavingMemorySuggestion] = useState(false);
   const [memoryStatusMessage, setMemoryStatusMessage] = useState<string | null>(null,);
+  const memoryDecisionPending = Boolean(memorySuggestion);
 
   useEffect(() => {
     setPrompt(taskCopy[task].defaultPrompt);
@@ -379,6 +380,7 @@ export function ChatPanel({
     setSavingMemorySuggestion(true);
     setMemoryStatusMessage(null);
 
+
     try {
       const proposeResponse = await fetch("/api/agent-memory/propose", {
         method: "POST",
@@ -423,6 +425,9 @@ export function ChatPanel({
           memory_id: proposePayload.memory.id,
         }),
       });
+
+      setMemorySuggestion(null);
+      setMemoryStatusMessage("Preference saved to memory.");
 
       const confirmPayload = (await confirmResponse.json()) as {
         ok: boolean;
@@ -538,6 +543,16 @@ export function ChatPanel({
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+
+      {memorySuggestion ? (
+        <MemorySuggestionCard
+          suggestion={memorySuggestion}
+          saving={savingMemorySuggestion}
+          onSave={() => void saveMemorySuggestion()}
+          onDismiss={() => setMemorySuggestion(null)}
+        />
+      ) : null}
+
       <div className="space-y-4">
         <div className="rounded-3xl border border-white/10 bg-slate-950/75 p-4 shadow-xl shadow-black/15">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -598,14 +613,7 @@ export function ChatPanel({
             </div>
           </div>
 
-          {memorySuggestion ? (
-            <MemorySuggestionCard
-              suggestion={memorySuggestion}
-              saving={savingMemorySuggestion}
-              onSave={() => void saveMemorySuggestion()}
-              onDismiss={() => setMemorySuggestion(null)}
-            />
-          ) : null}
+          
 
           {memoryStatusMessage ? (
             <p className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
@@ -626,7 +634,8 @@ export function ChatPanel({
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 rows={8}
-                className="min-h-[260px] w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-400/20"
+                disabled={memoryDecisionPending}
+                className="min-h-[260px] w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
                 placeholder={currentTaskCopy.primaryPlaceholder}
               />
             </label>
@@ -646,7 +655,8 @@ export function ChatPanel({
                   value={context}
                   onChange={(event) => setContext(event.target.value)}
                   rows={6}
-                  className="min-h-[145px] w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-400/20"
+                  disabled={memoryDecisionPending}
+                  className="min-h-[145px] w-full rounded-2xl border border-white/10 bg-black/25 px-3 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
                   placeholder={currentTaskCopy.secondaryPlaceholder}
                 />
               </label>
@@ -669,7 +679,7 @@ export function ChatPanel({
                       multiple
                       accept=".pdf,.docx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv,image/png,image/jpeg,image/webp"
                       className="hidden"
-                      disabled={uploadingAttachment}
+                      disabled={uploadingAttachment || memoryDecisionPending}
                       onChange={(event) => {
                         void handleAttachmentUpload(event.target.files);
                         event.currentTarget.value = "";
@@ -780,7 +790,7 @@ export function ChatPanel({
             <button
               type="button"
               onClick={() => void handleSubmit()}
-              disabled={loading}
+              disabled={loading || memoryDecisionPending}
               className="rounded-xl bg-gradient-to-r from-cyan-400 to-sky-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {loading ? "Running..." : currentTaskCopy.runLabel}
@@ -789,7 +799,7 @@ export function ChatPanel({
             <button
               type="button"
               onClick={handleLoadExample}
-              disabled={loading}
+              disabled={loading || memoryDecisionPending}
               className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
             >
               Example
@@ -798,7 +808,7 @@ export function ChatPanel({
             <button
               type="button"
               onClick={handleClear}
-              disabled={loading}
+              disabled={loading || memoryDecisionPending}
               className="rounded-xl border border-white/10 bg-white/0 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-70"
             >
               Clear
@@ -811,7 +821,7 @@ export function ChatPanel({
                 onTaskChange(task);
                 onProviderChange(provider.id);
               }}
-              disabled={loading}
+              disabled={loading || memoryDecisionPending}
               className="rounded-xl border border-white/10 bg-white/0 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-70"
             >
               Keep settings
