@@ -11,7 +11,9 @@ type RagAuditEventInput = {
     | "document_deleted"
     | "memory_cleared"
     | "low_similarity_warning"
-    | "supabase_delete_cascade_completed";
+    | "supabase_delete_cascade_completed"
+    | "unsupported_claim_detected"
+    | "low_confidence_answer";
   documentId?: string;
   fileName?: string;
   embeddingModel?: string;

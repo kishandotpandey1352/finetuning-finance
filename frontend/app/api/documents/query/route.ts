@@ -6,7 +6,8 @@ import type { DocumentTask, RetrievedSource } from "@/lib/server/documents/types
 import { runPremiumInference, validatePremiumInput } from "@/app/api/premium/router";
 import { writeRagAuditEvent } from "@/lib/server/documents/audit";
 import { readRagConfig } from "@/lib/server/documents/config";
-
+import { validateGroundedAnswer } from "@/lib/server/agents/grounding";
+import type { GroundedSourceForValidation } from "@/lib/server/agents/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -126,20 +127,16 @@ export async function POST(request: Request) {
     }));
 
     
+    const validationSources: GroundedSourceForValidation[] = sources.map(
+      (source, index) => ({
+        sourceNumber: index + 1,
+        fileName: source.fileName,
+        snippet: source.snippet,
+        score: source.score,
+      }),
+    );
 
     const bestScore = sources[0]?.score ?? 0;
-   await writeRagAuditEvent({
-      userId,
-      eventType: "document_queried",
-      embeddingModel: ragConfig.embeddingModel,
-      metadata: {
-        queryLength: question.length,
-        sourceCount: sources.length,
-        bestScore,
-        selectedDocumentCount: documentIds?.length ?? 0,
-      },
-});
-  
 
     if (bestScore < 0.3) {
       console.warn(
@@ -185,6 +182,70 @@ export async function POST(request: Request) {
 
     const answer = await runPremiumInference(premiumInput);
 
+    const grounding = await validateGroundedAnswer({
+      question,
+      answer: answer.output ?? "",
+      sources: validationSources,
+      providerId,
+    });
+
+    await writeRagAuditEvent({
+      userId,
+      eventType: "document_queried",
+      embeddingModel: ragConfig.embeddingModel,
+      metadata: {
+        queryLength: question.length,
+        sourceCount: sources.length,
+        bestScore,
+        selectedDocumentCount: documentIds?.length ?? 0,
+      },
+    });
+
+    let finalAnswer = answer;
+
+if (grounding.shouldRefuse || grounding.confidence === "low") {
+  finalAnswer = {
+    ...answer,
+    output: [
+      "I could not fully verify the answer from the retrieved document sources.",
+      grounding.reason ? `Reason: ${grounding.reason}` : null,
+      grounding.unsupportedClaims.length
+        ? `Unsupported claims: ${grounding.unsupportedClaims.join("; ")}`
+        : null,
+      "",
+      "Try uploading a more relevant document, selecting more documents, or asking a narrower question.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  };
+}
+
+    if (grounding.unsupportedClaims.length) {
+      await writeRagAuditEvent({
+        userId,
+        eventType: "unsupported_claim_detected",
+        embeddingModel: ragConfig.embeddingModel,
+        metadata: {
+          unsupportedClaims: grounding.unsupportedClaims,
+          confidence: grounding.confidence,
+          shouldRefuse: grounding.shouldRefuse,
+        },
+      });
+    }
+
+    if (grounding.confidence === "low") {
+      await writeRagAuditEvent({
+        userId,
+        eventType: "low_confidence_answer",
+        embeddingModel: ragConfig.embeddingModel,
+        metadata: {
+          reason: grounding.reason,
+          sourceCount: sources.length,
+          bestScore,
+        },
+      });
+    }
+
     console.info(
       JSON.stringify({
         event: "rag_query_completed",
@@ -202,14 +263,15 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       request_id: requestId,
-      answer,
+      answer: finalAnswer,
       sources,
       retrieval: {
         topK,
         bestScore,
         embeddingModel: queryEmbedding.model,
         usage: queryEmbedding.usage,
-      },
+        },
+      grounding,
     });
   } catch (error) {
     const message =
