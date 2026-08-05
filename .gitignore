@@ -31,4 +31,9 @@ out/
 .env.local
 
 # RAG
+frontend/.env.local
 frontend/.data/
+
+# agent-service
+agent-service/.data/
+agent-service/.venv/
