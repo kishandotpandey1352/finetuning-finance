@@ -14,6 +14,9 @@ from app.services.user_memory import (
     propose_user_memory,
 )
 
+from app.schemas.memory import DetectMemoryRequest, DetectMemoryResponse
+from app.services.memory_detector import detect_memory_suggestion
+
 
 router = APIRouter(prefix="/memory", tags=["memory"])
 
@@ -67,3 +70,12 @@ def delete_memory(
         return BasicOkResponse(ok=True)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+@router.post("/detect", response_model=DetectMemoryResponse)
+def detect_memory(request: DetectMemoryRequest):
+    suggestion = detect_memory_suggestion(request.text)
+
+    return DetectMemoryResponse(
+        ok=True,
+        suggestion=suggestion,
+    )

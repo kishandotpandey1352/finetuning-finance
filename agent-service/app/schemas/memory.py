@@ -58,3 +58,23 @@ class MemoryResponse(BaseModel):
 
 class BasicOkResponse(BaseModel):
     ok: bool
+
+
+class DetectMemoryRequest(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class MemorySuggestion(BaseModel):
+    is_memory_request: bool
+    memory_type: MemoryType | None = None
+    memory_key: str | None = None
+    memory_value: str | None = None
+    confidence: float = Field(default=0.0, ge=0, le=1)
+    requires_confirmation: bool = True
+    reason: str | None = None
+    blocked: bool = False
+
+
+class DetectMemoryResponse(BaseModel):
+    ok: bool
+    suggestion: MemorySuggestion

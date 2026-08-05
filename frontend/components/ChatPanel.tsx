@@ -15,6 +15,8 @@ import type {
   ProviderOption,
 } from "@/types";
 
+import { MemorySuggestionCard } from "@/components/MemorySuggestionCard";
+
 interface ChatPanelProps {
   auth: AuthState | null;
   mode: Exclude<AppMode, "compare">;
@@ -46,6 +48,17 @@ type AttachmentExtractResponse = {
   request_id?: string;
   attachment?: ChatAttachment;
   error?: string;
+};
+
+type MemorySuggestion = {
+  is_memory_request: boolean;
+  memory_type: string | null;
+  memory_key: string | null;
+  memory_value: string | null;
+  confidence: number;
+  requires_confirmation: boolean;
+  reason: string | null;
+  blocked: boolean;
 };
 
 const taskCopy: Record<
@@ -247,6 +260,9 @@ export function ChatPanel({
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [memorySuggestion, setMemorySuggestion] = useState<MemorySuggestion | null>(null);
+  const [savingMemorySuggestion, setSavingMemorySuggestion] = useState(false);
+  const [memoryStatusMessage, setMemoryStatusMessage] = useState<string | null>(null,);
 
   useEffect(() => {
     setPrompt(taskCopy[task].defaultPrompt);
@@ -323,6 +339,116 @@ export function ChatPanel({
     }
   }
 
+  async function detectMemoryFromPrompt(promptText: string) {
+    try {
+      const response = await fetch("/api/agent-memory/detect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: promptText,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        ok: boolean;
+        suggestion?: MemorySuggestion;
+      };
+
+      if (response.ok && payload.ok && payload.suggestion?.is_memory_request) {
+        setMemorySuggestion(payload.suggestion);
+        setMemoryStatusMessage(null);
+      }
+    } catch {
+      // Memory detection should never block normal chat.
+    }
+  }
+
+  async function saveMemorySuggestion() {
+    if (
+      !memorySuggestion ||
+      memorySuggestion.blocked ||
+      !memorySuggestion.memory_type ||
+      !memorySuggestion.memory_key ||
+      !memorySuggestion.memory_value
+    ) {
+      return;
+    }
+
+    setSavingMemorySuggestion(true);
+    setMemoryStatusMessage(null);
+
+    try {
+      const proposeResponse = await fetch("/api/agent-memory/propose", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          memory_type: memorySuggestion.memory_type,
+          memory_key: memorySuggestion.memory_key,
+          memory_value: memorySuggestion.memory_value,
+          confidence: memorySuggestion.confidence,
+          source: "chat-confirmed",
+          metadata: {
+            created_from: "chat_memory_suggestion",
+          },
+        }),
+      });
+
+      const proposePayload = (await proposeResponse.json()) as {
+        ok: boolean;
+        memory?: {
+          id: string;
+        };
+        error?: string;
+        detail?: string;
+      };
+
+      if (!proposeResponse.ok || !proposePayload.ok || !proposePayload.memory) {
+        throw new Error(
+          proposePayload.error ??
+            proposePayload.detail ??
+            "Failed to propose memory.",
+        );
+      }
+
+      const confirmResponse = await fetch("/api/agent-memory/confirm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          memory_id: proposePayload.memory.id,
+        }),
+      });
+
+      const confirmPayload = (await confirmResponse.json()) as {
+        ok: boolean;
+        error?: string;
+        detail?: string;
+      };
+
+      if (!confirmResponse.ok || !confirmPayload.ok) {
+        throw new Error(
+          confirmPayload.error ??
+            confirmPayload.detail ??
+            "Failed to confirm memory.",
+        );
+      }
+
+      setMemorySuggestion(null);
+      setMemoryStatusMessage("Preference saved to memory.");
+    } catch (error) {
+      setMemoryStatusMessage(
+        error instanceof Error ? error.message : "Failed to save memory.",
+      );
+    } finally {
+      setSavingMemorySuggestion(false);
+    }
+}
+
   function handleRemoveAttachment(attachmentId: string) {
     setAttachments((current) =>
       current.filter((attachment) => attachment.id !== attachmentId),
@@ -341,6 +467,9 @@ export function ChatPanel({
       );
       return;
     }
+
+    void detectMemoryFromPrompt(prompt);
+
 
     if (task === "qa" && !context.trim()) {
       setError("Add context before running Q&A.");
@@ -468,6 +597,21 @@ export function ChatPanel({
               </div>
             </div>
           </div>
+
+          {memorySuggestion ? (
+            <MemorySuggestionCard
+              suggestion={memorySuggestion}
+              saving={savingMemorySuggestion}
+              onSave={() => void saveMemorySuggestion()}
+              onDismiss={() => setMemorySuggestion(null)}
+            />
+          ) : null}
+
+          {memoryStatusMessage ? (
+            <p className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+              {memoryStatusMessage}
+            </p>
+          ) : null}
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
             <label className="block space-y-2">
