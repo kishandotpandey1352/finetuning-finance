@@ -35,5 +35,6 @@ frontend/.env.local
 frontend/.data/
 
 # agent-service
-agent-service/.data/
+agent-service/.env
 agent-service/.venv/
+agent-service/.data/

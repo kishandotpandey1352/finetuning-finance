@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.routers.agents import router as agents_router
 from app.routers.memory import router as memory_router
 
 
@@ -19,3 +20,4 @@ def health():
 
 
 app.include_router(memory_router)
+app.include_router(agents_router)
