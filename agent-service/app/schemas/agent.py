@@ -11,6 +11,7 @@ class AgentAnalyzeRequest(BaseModel):
     use_documents: bool = False
     document_ids: list[str] = Field(default_factory=list)
     top_k: int = Field(default=6, ge=1, le=20)
+    dataset_id: str | None = None
 
     metadata: dict[str, Any] = Field(default_factory=dict)
 

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +15,9 @@ class ToolName(str, Enum):
     financial_calculator = "financial_calculator"
     audit_log = "audit_log"
     document_search = "document_search"
+
+    # Phase 3E
+    csv_profile = "csv_profile"
 
 
 class ToolCallStatus(str, Enum):
@@ -40,6 +43,11 @@ class ToolCallRecord(BaseModel):
     error: str | None = None
 
 
+# ---------------------------------------------------------
+# Financial calculator
+# ---------------------------------------------------------
+
+
 class FinancialCalculationType(str, Enum):
     growth_rate = "growth_rate"
     margin = "margin"
@@ -50,10 +58,13 @@ class FinancialCalculationType(str, Enum):
 
 class FinancialCalculatorInput(BaseModel):
     calculation_type: FinancialCalculationType
+
     current_value: float | None = None
     previous_value: float | None = None
+
     numerator: float | None = None
     denominator: float | None = None
+
     beginning_value: float | None = None
     ending_value: float | None = None
     periods: float | None = None
@@ -64,6 +75,11 @@ class FinancialCalculatorOutput(BaseModel):
     result: float
     result_percent: float | None = None
     explanation: str
+
+
+# ---------------------------------------------------------
+# Audit
+# ---------------------------------------------------------
 
 
 class AuditLogInput(BaseModel):
@@ -78,16 +94,10 @@ class AuditLogOutput(BaseModel):
     event_type: str
 
 
-class ToolPlan(BaseModel):
-    use_memory_lookup: bool = True
+# ---------------------------------------------------------
+# Document search
+# ---------------------------------------------------------
 
-    use_financial_calculator: bool = False
-    financial_calculator_input: FinancialCalculatorInput | None = None
-
-    use_document_search: bool = False
-    document_search_input: DocumentSearchInput | None = None
-
-    reason: str
 
 class DocumentSearchInput(BaseModel):
     query: str = Field(min_length=1)
@@ -111,3 +121,33 @@ class DocumentSearchOutput(BaseModel):
     source_count: int = 0
     best_score: float = 0.0
     embedding_model: str
+
+
+# ---------------------------------------------------------
+# CSV profile - Phase 3E
+# ---------------------------------------------------------
+
+
+class CsvProfileInput(BaseModel):
+    dataset_id: str = Field(min_length=1)
+
+
+# ---------------------------------------------------------
+# Tool plan
+# ---------------------------------------------------------
+
+
+class ToolPlan(BaseModel):
+    use_memory_lookup: bool = True
+
+    use_financial_calculator: bool = False
+    financial_calculator_input: FinancialCalculatorInput | None = None
+
+    use_document_search: bool = False
+    document_search_input: DocumentSearchInput | None = None
+
+    # Phase 3E
+    use_csv_profile: bool = False
+    csv_profile_input: CsvProfileInput | None = None
+
+    reason: str

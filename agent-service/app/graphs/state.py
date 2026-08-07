@@ -13,7 +13,7 @@ class FinanceAgentState(TypedDict, total=False):
     use_documents: bool
     document_ids: list[str]
     top_k: int
-
+    dataset_id: str | None
     memory_context: str
     memory_used_count: int
 

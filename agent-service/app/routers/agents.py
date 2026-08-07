@@ -25,20 +25,23 @@ def analyze(
         graph = build_finance_memory_graph()
 
         result = graph.invoke(
-            {
-                "request_id": request_id,
-                "user_id": user_id,
-                "question": request.question.strip(),
-                "provider_id": request.provider_id,
+                    {
+                    "request_id": request_id,
+                    "user_id": user_id,
+                    "question": request.question.strip(),
+                    "provider_id": request.provider_id,
 
-                # Phase 3D - document retrieval controls
-                "use_documents": request.use_documents,
-                "document_ids": request.document_ids,
-                "top_k": request.top_k,
+                    # Phase 3D
+                    "use_documents": request.use_documents,
+                    "document_ids": request.document_ids,
+                    "top_k": request.top_k,
 
-                "metadata": request.metadata,
-            }
-        )
+                    # Phase 3E
+                    "dataset_id": request.dataset_id,
+
+                    "metadata": request.metadata,
+                }
+            )
 
         tool_plan = result.get("tool_plan")
         tool_results = result.get("tool_results", [])

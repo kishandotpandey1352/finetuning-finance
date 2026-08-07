@@ -149,6 +149,14 @@ Document grounding rules:
 - If the retrieved evidence is missing, weak, contradictory, or insufficient, say that clearly.
 - If no document sources were retrieved for a document-grounded question, explain that the available documents do not provide enough evidence rather than guessing.
 
+CSV analysis rules:
+- Treat csv_profile results as deterministic structured-data evidence.
+- Use the reported row counts, inferred column types, missing-value counts, and numeric statistics exactly as returned by the tool.
+- Do not invent rows, columns, statistics, or values that are not present in the CSV profile.
+- Do not treat CSV data as RAG/document evidence.
+- When chart suggestions exist, present them as suggestions rather than claiming a chart has already been rendered.
+- If the csv_profile tool failed, explain that the dataset could not be analyzed instead of guessing.
+
 Confirmed user preferences:
 {memory_context}
 

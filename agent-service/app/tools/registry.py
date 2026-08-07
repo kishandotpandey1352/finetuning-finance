@@ -1,15 +1,17 @@
 from app.schemas.tools import (
     AuditLogInput,
+    CsvProfileInput,
+    DocumentSearchInput,
     FinancialCalculatorInput,
     ToolDefinition,
     ToolName,
     ToolRiskLevel,
 )
 from app.tools.audit import audit_log_tool
+from app.tools.document_search import document_search_tool
 from app.tools.financial_calculator import financial_calculator_tool
 from app.tools.memory import memory_lookup_tool
-from app.schemas.tools import DocumentSearchInput
-from app.tools.document_search import document_search_tool
+from app.tools.csv_profile import profile_csv_dataset
 
 
 TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
@@ -20,13 +22,17 @@ TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
         requires_confirmation=False,
         allowed_in_background=True,
     ),
+
     ToolName.financial_calculator: ToolDefinition(
         name=ToolName.financial_calculator,
-        description="Calculate growth, margin, delta, percentage, or CAGR.",
+        description=(
+            "Calculate growth, margin, delta, percentage, or CAGR."
+        ),
         risk_level=ToolRiskLevel.low,
         requires_confirmation=False,
         allowed_in_background=True,
     ),
+
     ToolName.audit_log: ToolDefinition(
         name=ToolName.audit_log,
         description="Write an agent audit event.",
@@ -44,7 +50,20 @@ TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
         risk_level=ToolRiskLevel.low,
         requires_confirmation=False,
         allowed_in_background=True,
-),
+    ),
+
+    # Phase 3E
+    ToolName.csv_profile: ToolDefinition(
+        name=ToolName.csv_profile,
+        description=(
+            "Profile an uploaded CSV dataset using deterministic "
+            "structured-data analysis. Returns column types, missing "
+            "values, numeric statistics, sample rows, and chart suggestions."
+        ),
+        risk_level=ToolRiskLevel.low,
+        requires_confirmation=False,
+        allowed_in_background=True,
+    ),
 }
 
 
@@ -52,12 +71,22 @@ def list_tool_definitions() -> list[ToolDefinition]:
     return list(TOOL_REGISTRY.values())
 
 
-def run_memory_lookup(user_id: str) -> dict:
-    return memory_lookup_tool(user_id)
+def run_memory_lookup(
+    user_id: str,
+) -> dict:
+    return memory_lookup_tool(
+        user_id
+    )
 
 
-def run_financial_calculator(tool_input: FinancialCalculatorInput) -> dict:
-    return financial_calculator_tool(tool_input).model_dump(mode="json")
+def run_financial_calculator(
+    tool_input: FinancialCalculatorInput,
+) -> dict:
+    return financial_calculator_tool(
+        tool_input
+    ).model_dump(
+        mode="json"
+    )
 
 
 def run_audit_log(
@@ -65,7 +94,13 @@ def run_audit_log(
     request_id: str,
     tool_input: AuditLogInput,
 ) -> dict:
-    return audit_log_tool(user_id, request_id, tool_input).model_dump(mode="json")
+    return audit_log_tool(
+        user_id,
+        request_id,
+        tool_input,
+    ).model_dump(
+        mode="json"
+    )
 
 
 def run_document_search(
@@ -75,4 +110,18 @@ def run_document_search(
     return document_search_tool(
         user_id,
         tool_input,
-    ).model_dump(mode="json")
+    ).model_dump(
+        mode="json"
+    )
+
+
+def run_csv_profile(
+    user_id: str,
+    tool_input: CsvProfileInput,
+) -> dict:
+    return profile_csv_dataset(
+        dataset_id=tool_input.dataset_id,
+        user_id=user_id,
+    ).model_dump(
+        mode="json"
+    )

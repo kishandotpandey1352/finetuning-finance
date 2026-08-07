@@ -1,6 +1,7 @@
 from app.graphs.state import FinanceAgentState
 from app.schemas.tools import ToolCallRecord, ToolCallStatus, ToolName
 from app.tools.registry import (
+    run_csv_profile,
     run_document_search,
     run_financial_calculator,
     run_memory_lookup,
@@ -73,9 +74,55 @@ def run_tools_node(state: FinanceAgentState) -> FinanceAgentState:
                     error=str(error),
                 )
             )
+    # ---------------------------------------------------------
+# 3. CSV profile - Phase 3E
+# ---------------------------------------------------------
+
+    if (
+        tool_plan.use_csv_profile
+        and tool_plan.csv_profile_input
+    ):
+        csv_profile_input = (
+            tool_plan.csv_profile_input
+        )
+
+        try:
+            csv_profile_output = (
+                run_csv_profile(
+                    state["user_id"],
+                    csv_profile_input,
+                )
+            )
+
+            tool_results.append(
+                ToolCallRecord(
+                    tool_name=ToolName.csv_profile,
+                    status=ToolCallStatus.completed,
+                    input=(
+                        csv_profile_input.model_dump(
+                            mode="json"
+                        )
+                    ),
+                    output=csv_profile_output,
+                )
+            )
+
+        except Exception as error:
+            tool_results.append(
+                ToolCallRecord(
+                    tool_name=ToolName.csv_profile,
+                    status=ToolCallStatus.failed,
+                    input=(
+                        csv_profile_input.model_dump(
+                            mode="json"
+                        )
+                    ),
+                    error=str(error),
+                )
+            )
 
     # ---------------------------------------------------------
-    # 3. Financial calculator
+    # 4. Financial calculator
     # ---------------------------------------------------------
     if (
         tool_plan.use_financial_calculator
