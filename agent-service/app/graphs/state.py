@@ -10,6 +10,10 @@ class FinanceAgentState(TypedDict, total=False):
     provider_id: str | None
     metadata: dict[str, Any]
 
+    use_documents: bool
+    document_ids: list[str]
+    top_k: int
+
     memory_context: str
     memory_used_count: int
 
@@ -18,3 +22,5 @@ class FinanceAgentState(TypedDict, total=False):
 
     answer: str
     model: str
+
+    grounding: dict[str, Any]

@@ -14,6 +14,7 @@ class ToolName(str, Enum):
     memory_lookup = "memory_lookup"
     financial_calculator = "financial_calculator"
     audit_log = "audit_log"
+    document_search = "document_search"
 
 
 class ToolCallStatus(str, Enum):
@@ -79,6 +80,34 @@ class AuditLogOutput(BaseModel):
 
 class ToolPlan(BaseModel):
     use_memory_lookup: bool = True
+
     use_financial_calculator: bool = False
     financial_calculator_input: FinancialCalculatorInput | None = None
+
+    use_document_search: bool = False
+    document_search_input: DocumentSearchInput | None = None
+
     reason: str
+
+class DocumentSearchInput(BaseModel):
+    query: str = Field(min_length=1)
+    document_ids: list[str] = Field(default_factory=list)
+    top_k: int = Field(default=6, ge=1, le=20)
+
+
+class DocumentSource(BaseModel):
+    source_number: int
+    document_id: str
+    chunk_id: str
+    file_name: str
+    chunk_index: int
+    page_number: int | None = None
+    score: float
+    snippet: str
+
+
+class DocumentSearchOutput(BaseModel):
+    sources: list[DocumentSource] = Field(default_factory=list)
+    source_count: int = 0
+    best_score: float = 0.0
+    embedding_model: str

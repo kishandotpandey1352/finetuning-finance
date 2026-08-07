@@ -30,6 +30,12 @@ def analyze(
                 "user_id": user_id,
                 "question": request.question.strip(),
                 "provider_id": request.provider_id,
+
+                # Phase 3D - document retrieval controls
+                "use_documents": request.use_documents,
+                "document_ids": request.document_ids,
+                "top_k": request.top_k,
+
                 "metadata": request.metadata,
             }
         )
@@ -48,6 +54,7 @@ def analyze(
             tool_results=[
                 tool_result.model_dump(mode="json") for tool_result in tool_results
             ],
+            grounding=result.get("grounding"),
         )
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error

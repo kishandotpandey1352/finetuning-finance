@@ -8,6 +8,8 @@ from app.schemas.tools import (
 from app.tools.audit import audit_log_tool
 from app.tools.financial_calculator import financial_calculator_tool
 from app.tools.memory import memory_lookup_tool
+from app.schemas.tools import DocumentSearchInput
+from app.tools.document_search import document_search_tool
 
 
 TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
@@ -32,6 +34,17 @@ TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
         requires_confirmation=False,
         allowed_in_background=True,
     ),
+
+    ToolName.document_search: ToolDefinition(
+        name=ToolName.document_search,
+        description=(
+            "Search indexed user documents and return source-backed "
+            "chunks ranked by semantic similarity."
+        ),
+        risk_level=ToolRiskLevel.low,
+        requires_confirmation=False,
+        allowed_in_background=True,
+),
 }
 
 
@@ -53,3 +66,13 @@ def run_audit_log(
     tool_input: AuditLogInput,
 ) -> dict:
     return audit_log_tool(user_id, request_id, tool_input).model_dump(mode="json")
+
+
+def run_document_search(
+    user_id: str,
+    tool_input: DocumentSearchInput,
+) -> dict:
+    return document_search_tool(
+        user_id,
+        tool_input,
+    ).model_dump(mode="json")

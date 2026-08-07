@@ -6,7 +6,7 @@ from app.schemas.tools import (
     FinancialCalculatorInput,
     ToolPlan,
 )
-
+from app.schemas.tools import DocumentSearchInput
 
 NUMBER_PATTERN = re.compile(r"-?\d+(?:\.\d+)?")
 
@@ -65,12 +65,25 @@ def plan_tools_node(state: FinanceAgentState) -> FinanceAgentState:
             )
             reason = "Detected a CAGR question with beginning, ending, and period values."
 
+    use_document_search = state.get("use_documents", False)
+
+    document_search_input = None
+
+    if use_document_search:
+        document_search_input = DocumentSearchInput(
+            query=question,
+            document_ids=state.get("document_ids", []),
+            top_k=state.get("top_k", 6),
+        )
+
     return {
         **state,
         "tool_plan": ToolPlan(
-            use_memory_lookup=True,
-            use_financial_calculator=use_financial_calculator,
-            financial_calculator_input=calculator_input,
-            reason=reason,
-        ),
+                    use_memory_lookup=True,
+                    use_financial_calculator=use_financial_calculator,
+                    financial_calculator_input=calculator_input,
+                    use_document_search=use_document_search,
+                    document_search_input=document_search_input,
+                    reason=reason,
+                ),
     }
