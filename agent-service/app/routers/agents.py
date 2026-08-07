@@ -34,6 +34,9 @@ def analyze(
             }
         )
 
+        tool_plan = result.get("tool_plan")
+        tool_results = result.get("tool_results", [])
+
         return AgentAnalyzeResponse(
             ok=True,
             request_id=request_id,
@@ -41,6 +44,10 @@ def analyze(
             memory_context=result.get("memory_context", ""),
             memory_used_count=result.get("memory_used_count", 0),
             model=result.get("model", ""),
+            tool_plan=tool_plan.model_dump(mode="json") if tool_plan else None,
+            tool_results=[
+                tool_result.model_dump(mode="json") for tool_result in tool_results
+            ],
         )
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error

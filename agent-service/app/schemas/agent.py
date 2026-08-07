@@ -17,3 +17,5 @@ class AgentAnalyzeResponse(BaseModel):
     memory_context: str
     memory_used_count: int
     model: str
+    tool_plan: dict[str, Any] | None = None
+    tool_results: list[dict[str, Any]] = Field(default_factory=list)

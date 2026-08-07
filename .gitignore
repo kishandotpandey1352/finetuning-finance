@@ -38,3 +38,5 @@ frontend/.data/
 agent-service/.env
 agent-service/.venv/
 agent-service/.data/
+frontend/.env.local
+frontend/.data/

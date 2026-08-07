@@ -1,5 +1,7 @@
 from typing import Any, TypedDict
 
+from app.schemas.tools import ToolCallRecord, ToolPlan
+
 
 class FinanceAgentState(TypedDict, total=False):
     request_id: str
@@ -10,6 +12,9 @@ class FinanceAgentState(TypedDict, total=False):
 
     memory_context: str
     memory_used_count: int
+
+    tool_plan: ToolPlan
+    tool_results: list[ToolCallRecord]
 
     answer: str
     model: str
