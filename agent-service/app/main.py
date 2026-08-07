@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from app.routers.agents import router as agents_router
 from app.routers.memory import router as memory_router
 from app.routers.tools import router as tools_router
-
+from app.routers.data import router as data_router
 
 app = FastAPI(
     title="Finance AI Agent Service",
@@ -23,3 +23,4 @@ def health():
 app.include_router(memory_router)
 app.include_router(agents_router)
 app.include_router(tools_router)
+app.include_router(data_router)
