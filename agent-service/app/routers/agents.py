@@ -19,6 +19,22 @@ def analyze(
     x_user_id: str | None = Header(default=None),
 ):
     request_id = str(uuid4())
+    effective_dataset_id = request.dataset_id
+
+    if request.chart_request:
+        chart_dataset_id = (
+            request.chart_request.dataset_id
+        )
+
+        if (effective_dataset_id and effective_dataset_id!= chart_dataset_id):
+            raise HTTPException(status_code=400,detail=(
+                    "dataset_id and "
+                    "chart_request.dataset_id "
+                    "must refer to the same dataset."
+                ),
+            )
+
+        effective_dataset_id = (chart_dataset_id)
 
     try:
         user_id = get_user_id(request.user_id, x_user_id)
@@ -36,8 +52,10 @@ def analyze(
                     "document_ids": request.document_ids,
                     "top_k": request.top_k,
 
-                    # Phase 3E
-                    "dataset_id": request.dataset_id,
+                    "dataset_id": effective_dataset_id,
+
+                    # Phase 3F
+                    "chart_request": request.chart_request,
 
                     "metadata": request.metadata,
                 }

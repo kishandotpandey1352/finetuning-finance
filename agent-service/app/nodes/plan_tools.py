@@ -9,6 +9,7 @@ from app.schemas.tools import (
     ToolPlan,
 )
 from app.schemas.tools import DocumentSearchInput
+from app.schemas.chart import ChartRequest
 
 NUMBER_PATTERN = re.compile(
     r"-?\d+(?:\.\d+)?"
@@ -200,6 +201,37 @@ def plan_tools_node(
             "so structured dataset profiling is required."
         )
 
+    # ---------------------------------------------------------
+    # Chart planning - Phase 3F
+    # ---------------------------------------------------------
+
+    chart_request = state.get(
+        "chart_request"
+    )
+
+    use_chart_planner = (
+        chart_request is not None
+    )
+
+    chart_planner_input = None
+
+    if chart_request:
+        chart_planner_input = (
+            ChartRequest(
+                dataset_id=chart_request.dataset_id,
+                chart_type=chart_request.chart_type,
+                x=chart_request.x,
+                series=chart_request.series,
+                title=chart_request.title,
+                max_rows=chart_request.max_rows,
+            )
+        )
+
+        reason_parts.append(
+            "A structured chart request was supplied, "
+            "so a validated chart specification is required."
+        )
+
     return {
         **state,
         "tool_plan": ToolPlan(
@@ -226,8 +258,16 @@ def plan_tools_node(
                 csv_profile_input
             ),
 
+            # Phase 3F
+            use_chart_planner=(
+                use_chart_planner
+            ),
+            chart_planner_input=(
+                chart_planner_input
+            ),
+
             reason=" ".join(
                 reason_parts
             ),
-        ),
+        )
     }

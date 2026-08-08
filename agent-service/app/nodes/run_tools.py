@@ -7,6 +7,14 @@ from app.tools.registry import (
     run_memory_lookup,
 )
 
+from app.tools.registry import (
+    run_chart_planner,
+    run_csv_profile,
+    run_document_search,
+    run_financial_calculator,
+    run_memory_lookup,
+)
+
 
 def run_tools_node(state: FinanceAgentState) -> FinanceAgentState:
     tool_plan = state["tool_plan"]
@@ -150,6 +158,65 @@ def run_tools_node(state: FinanceAgentState) -> FinanceAgentState:
                     tool_name=ToolName.financial_calculator,
                     status=ToolCallStatus.failed,
                     input=calculator_input.model_dump(mode="json"),
+                    error=str(error),
+                )
+            )
+
+    # ---------------------------------------------------------
+    # Chart planner - Phase 3F
+    # ---------------------------------------------------------
+
+    if (
+        tool_plan.use_chart_planner
+        and tool_plan.chart_planner_input
+    ):
+        chart_planner_input = (
+            tool_plan.chart_planner_input
+        )
+
+        try:
+            chart_planner_output = (
+                run_chart_planner(
+                    state["user_id"],
+                    chart_planner_input,
+                )
+            )
+
+            tool_results.append(
+                ToolCallRecord(
+                    tool_name=(
+                        ToolName.chart_planner
+                    ),
+                    status=(
+                        ToolCallStatus.completed
+                    ),
+                    input=(
+                        chart_planner_input
+                        .model_dump(
+                            mode="json"
+                        )
+                    ),
+                    output=(
+                        chart_planner_output
+                    ),
+                )
+            )
+
+        except Exception as error:
+            tool_results.append(
+                ToolCallRecord(
+                    tool_name=(
+                        ToolName.chart_planner
+                    ),
+                    status=(
+                        ToolCallStatus.failed
+                    ),
+                    input=(
+                        chart_planner_input
+                        .model_dump(
+                            mode="json"
+                        )
+                    ),
                     error=str(error),
                 )
             )

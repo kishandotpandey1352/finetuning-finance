@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
+from app.schemas.chart import ChartRequest
 
 class ToolRiskLevel(str, Enum):
     low = "low"
@@ -18,6 +18,8 @@ class ToolName(str, Enum):
 
     # Phase 3E
     csv_profile = "csv_profile"
+    # Phase 3F
+    chart_planner = "chart_planner"
 
 
 class ToolCallStatus(str, Enum):
@@ -146,8 +148,11 @@ class ToolPlan(BaseModel):
     use_document_search: bool = False
     document_search_input: DocumentSearchInput | None = None
 
-    # Phase 3E
     use_csv_profile: bool = False
     csv_profile_input: CsvProfileInput | None = None
+
+    # Phase 3F
+    use_chart_planner: bool = False
+    chart_planner_input: ChartRequest | None = None
 
     reason: str

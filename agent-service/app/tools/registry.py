@@ -12,7 +12,8 @@ from app.tools.document_search import document_search_tool
 from app.tools.financial_calculator import financial_calculator_tool
 from app.tools.memory import memory_lookup_tool
 from app.tools.csv_profile import profile_csv_dataset
-
+from app.schemas.chart import ChartRequest
+from app.tools.chart_planner import build_chart_spec
 
 TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
     ToolName.memory_lookup: ToolDefinition(
@@ -59,6 +60,20 @@ TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
             "Profile an uploaded CSV dataset using deterministic "
             "structured-data analysis. Returns column types, missing "
             "values, numeric statistics, sample rows, and chart suggestions."
+        ),
+        risk_level=ToolRiskLevel.low,
+        requires_confirmation=False,
+        allowed_in_background=True,
+    ),
+
+    # Phase 3F-B
+    ToolName.chart_planner: ToolDefinition(
+        name=ToolName.chart_planner,
+        description=(
+            "Build a validated chart specification from an uploaded "
+            "structured dataset. Validates columns, parses financial "
+            "numeric values, prepares chart-safe data, and reports "
+            "source coverage and warnings."
         ),
         risk_level=ToolRiskLevel.low,
         requires_confirmation=False,
@@ -122,6 +137,17 @@ def run_csv_profile(
     return profile_csv_dataset(
         dataset_id=tool_input.dataset_id,
         user_id=user_id,
+    ).model_dump(
+        mode="json"
+    )
+
+def run_chart_planner(
+    user_id: str,
+    tool_input: ChartRequest,
+) -> dict:
+    return build_chart_spec(
+        user_id=user_id,
+        request=tool_input,
     ).model_dump(
         mode="json"
     )
