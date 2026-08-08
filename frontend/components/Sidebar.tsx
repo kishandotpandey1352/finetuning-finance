@@ -25,6 +25,12 @@ const navItems = [
     accent: "lime",
   },
   {
+  href: "/data",
+  label: "Data Analysis",
+  description: "CSV",
+  accent: "amber",
+  },
+  {
     href: "/compare",
     label: "Compare",
     description: "Models",
@@ -79,24 +85,54 @@ const pageThemes = {
     chip: "border-emerald-300/25 bg-emerald-300/10 text-emerald-100",
     sublabel: "text-emerald-200",
   },
+  amber: {
+    panel: "border-amber-300/20 bg-amber-300/5",
+    active:
+      "border-amber-300/60 bg-amber-300/15 text-amber-50 shadow-[0_0_28px_rgba(245,158,11,0.14)]",
+    inactive:
+      "border-white/10 bg-white/5 text-slate-300 hover:border-amber-300/35 hover:bg-amber-300/10 hover:text-white",
+    eyebrow: "text-amber-200/70",
+    chip: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+    sublabel: "text-amber-200",
+  }
 } as const;
 
-function getActiveTheme(pathname: string) {
-  if (pathname.startsWith("/doc-search")) {
+function getActiveTheme(
+  pathname: string,) {
+  if (
+    pathname.startsWith(
+      "/doc-search",
+    )
+  ) {
     return pageThemes.lime;
   }
 
-  if (pathname.startsWith("/compare")) {
+  if (
+    pathname.startsWith(
+      "/data",
+    )
+  ) {
+    return pageThemes.amber;
+  }
+
+  if (
+    pathname.startsWith(
+      "/compare",
+    )
+  ) {
     return pageThemes.violet;
   }
 
-  if (pathname.startsWith("/history")) {
+  if (
+    pathname.startsWith(
+      "/history",
+    )
+  ) {
     return pageThemes.emerald;
   }
 
   return pageThemes.cyan;
 }
-
 export function Sidebar({ displayName, mode, onLogout }: SidebarProps) {
   const pathname = usePathname();
   const theme = getActiveTheme(pathname);
