@@ -7,6 +7,18 @@ import {
   useState,
 } from "react";
 
+import {
+  ChartRenderer,
+} from "@/components/charts/ChartRenderer";
+
+import {
+  createChart,
+} from "@/lib/chart-api";
+
+import type {
+  ChartSpec,
+  ChartType,
+} from "@/types/chart";
 
 type NumericSummary = {
   min?: number | null;
@@ -131,6 +143,7 @@ type WorkspaceTab =
   | "overview"
   | "columns"
   | "preview"
+  | "charts"
   | "insights";
 
 
@@ -270,6 +283,8 @@ function typeBadgeClass(
 }
 
 
+
+
 function chartBadgeClass(
   chartType: ChartSuggestion["chart_type"],
 ) {
@@ -394,6 +409,42 @@ export function DataWorkspace() {
     null,
   );
 
+  const [
+    chartType,
+    setChartType,
+  ] = useState<ChartType>(
+    "line",
+  );
+
+  const [
+    chartX,
+    setChartX,
+  ] = useState("");
+
+  const [
+    chartSeries,
+    setChartSeries,
+  ] = useState<string[]>(
+    [],
+  );
+
+  const [
+    chartTitle,
+    setChartTitle,
+  ] = useState("");
+
+  const [
+    chartSpec,
+    setChartSpec,
+  ] =
+    useState<ChartSpec | null>(
+      null,
+    );
+
+  const [
+    buildingChart,
+    setBuildingChart,
+  ] = useState(false);
 
   const datasetId =
     upload?.dataset_id ??
@@ -442,6 +493,65 @@ export function DataWorkspace() {
       [profile],
     );
 
+  const numericColumns =
+    useMemo(
+      () =>
+        profile?.columns.filter(
+          (column) =>
+            column.inferred_type ===
+            "numeric",
+        ) ?? [],
+      [profile],
+    );
+
+
+  const allColumnNames =
+    useMemo(
+      () =>
+        profile?.columns.map(
+          (column) =>
+            column.name,
+        ) ?? [],
+      [profile],
+    );
+
+
+  const numericColumnNames =
+    useMemo(
+      () =>
+        numericColumns.map(
+          (column) =>
+            column.name,
+        ),
+      [numericColumns],
+    );
+
+
+  const selectableSeriesColumns =
+    useMemo(
+      () =>
+        chartType === "table"
+          ? allColumnNames.filter(
+              (column) =>
+                column !== chartX,
+            )
+          : numericColumnNames.filter(
+              (column) =>
+                !(
+                  chartType ===
+                    "scatter" &&
+                  column ===
+                    chartX
+                ),
+            ),
+      [
+        chartType,
+        chartX,
+        allColumnNames,
+        numericColumnNames,
+      ],
+    );
+
 
   function resetFileInput() {
     if (fileInputRef.current) {
@@ -455,8 +565,16 @@ export function DataWorkspace() {
     setSelectedFile(null);
     setUpload(null);
     setProfile(null);
+
     setAnalysisAnswer(null);
     setAnalysisModel(null);
+
+    setChartSpec(null);
+    setChartType("line");
+    setChartX("");
+    setChartSeries([]);
+    setChartTitle("");
+
     setActiveTab("overview");
 
     resetFileInput();
@@ -473,6 +591,7 @@ export function DataWorkspace() {
     setError(null);
     setStatusMessage(null);
     setAnalysisAnswer(null);
+    setChartSpec(null);
 
     if (!file) {
       setSelectedFile(null);
@@ -513,6 +632,361 @@ export function DataWorkspace() {
     setSelectedFile(file);
   }
 
+  function initializeChartBuilder(
+    nextProfile: DatasetProfileResponse,
+  ) {
+    setChartSpec(null);
+
+    const suggestion =
+      nextProfile
+        .chart_suggestions?.[0];
+
+    if (suggestion) {
+      setChartType(
+        suggestion.chart_type,
+      );
+
+      setChartX(
+        suggestion.x ?? "",
+      );
+
+      setChartSeries(
+        suggestion.series ?? [],
+      );
+
+      setChartTitle("");
+
+      return;
+    }
+
+    const numeric =
+      nextProfile.columns.filter(
+        (column) =>
+          column.inferred_type ===
+          "numeric",
+      );
+
+    const date =
+      nextProfile.columns.find(
+        (column) =>
+          column.inferred_type ===
+          "date",
+      );
+
+    if (
+      date &&
+      numeric.length
+    ) {
+      setChartType("line");
+
+      setChartX(
+        date.name,
+      );
+
+      setChartSeries(
+        numeric
+          .slice(0, 2)
+          .map(
+            (column) =>
+              column.name,
+          ),
+      );
+
+      return;
+    }
+
+    if (
+      numeric.length >= 2
+    ) {
+      setChartType(
+        "scatter",
+      );
+
+      setChartX(
+        numeric[0].name,
+      );
+
+      setChartSeries([
+        numeric[1].name,
+      ]);
+
+      return;
+    }
+
+    setChartType(
+      "table",
+    );
+
+    setChartX(
+      nextProfile
+        .columns[0]
+        ?.name ?? "",
+    );
+
+    setChartSeries([]);
+  }
+
+  function handleChartTypeChange(
+      nextType: ChartType,
+    ) {
+      setChartType(
+        nextType,
+      );
+
+      setChartSpec(null);
+
+      if (
+        nextType ===
+        "scatter"
+      ) {
+        const firstNumeric =
+          numericColumnNames[0] ??
+          "";
+
+        const secondNumeric =
+          numericColumnNames.find(
+            (column) =>
+              column !==
+              firstNumeric,
+          ) ?? "";
+
+        setChartX(
+          firstNumeric,
+        );
+
+        setChartSeries(
+          secondNumeric
+            ? [secondNumeric]
+            : [],
+        );
+
+        return;
+      }
+
+      if (
+        nextType ===
+        "table"
+      ) {
+        if (!chartX) {
+          setChartX(
+            allColumnNames[0] ??
+              "",
+          );
+        }
+
+        return;
+      }
+
+      // line / bar / area
+      if (
+        !chartX ||
+        !allColumnNames.includes(
+          chartX,
+        )
+      ) {
+        const preferredX =
+          profile?.columns.find(
+            (column) =>
+              column.inferred_type ===
+              "date",
+          )?.name ??
+          allColumnNames[0] ??
+          "";
+
+        setChartX(
+          preferredX,
+        );
+      }
+
+      if (
+        !chartSeries.length
+      ) {
+        setChartSeries(
+          numericColumnNames.slice(
+            0,
+            2,
+          ),
+        );
+      }
+    }
+
+  function toggleChartSeries(
+    columnName: string,
+  ) {
+    setChartSpec(null);
+
+    if (
+      chartType ===
+      "scatter"
+    ) {
+      setChartSeries([
+        columnName,
+      ]);
+
+      return;
+    }
+
+    setChartSeries(
+      (current) => {
+        if (
+          current.includes(
+            columnName,
+          )
+        ) {
+          return current.filter(
+            (column) =>
+              column !==
+              columnName,
+          );
+        }
+
+        return [
+          ...current,
+          columnName,
+        ];
+      },
+    );
+  }
+
+
+  function applyChartSuggestion(
+    suggestion: ChartSuggestion,
+  ) {
+    setChartType(
+      suggestion.chart_type,
+    );
+
+    setChartX(
+      suggestion.x ?? "",
+    );
+
+    setChartSeries(
+      suggestion.series ?? [],
+    );
+
+    setChartTitle("");
+    setChartSpec(null);
+
+    setActiveTab(
+      "charts",
+    );
+  }
+
+
+  async function handleBuildChart() {
+    if (!datasetId) {
+      setError(
+        "Upload a dataset before creating a chart.",
+      );
+
+      return;
+    }
+
+    if (
+      chartType !==
+        "table" &&
+      !chartX
+    ) {
+      setError(
+        "Choose an X-axis column.",
+      );
+
+      return;
+    }
+
+    if (
+      chartType !==
+        "table" &&
+      !chartSeries.length
+    ) {
+      setError(
+        "Choose at least one numeric series.",
+      );
+
+      return;
+    }
+
+    if (
+      chartType ===
+        "scatter" &&
+      chartSeries.length !== 1
+    ) {
+      setError(
+        "Scatter charts require exactly one Y-axis series.",
+      );
+
+      return;
+    }
+
+    if (
+      chartType ===
+        "scatter" &&
+      chartX &&
+      !numericColumnNames.includes(
+        chartX,
+      )
+    ) {
+      setError(
+        "Scatter chart X-axis must be numeric.",
+      );
+
+      return;
+    }
+
+    setBuildingChart(
+      true,
+    );
+
+    setError(null);
+
+    setStatusMessage(
+      "Building validated chart specification...",
+    );
+
+    try {
+      const spec =
+        await createChart({
+          dataset_id:
+            datasetId,
+
+          chart_type:
+            chartType,
+
+          x:
+            chartX ||
+            undefined,
+
+          series:
+            chartSeries,
+
+          title:
+            chartTitle.trim() ||
+            undefined,
+        });
+
+      setChartSpec(
+        spec,
+      );
+
+      setStatusMessage(
+        `Chart prepared with ${Math.round(
+          spec.source_coverage *
+            100,
+        )}% source coverage.`,
+      );
+    } catch (chartError) {
+      setError(
+        chartError instanceof Error
+          ? chartError.message
+          : "Chart creation failed.",
+      );
+    } finally {
+      setBuildingChart(
+        false,
+      );
+    }
+  }
+
 
   async function loadProfile(
     nextDatasetId: string,
@@ -545,6 +1019,10 @@ export function DataWorkspace() {
       }
 
       setProfile(payload);
+
+      initializeChartBuilder(
+          payload,
+        );
 
       setStatusMessage(
         `${payload.file_name} profiled successfully: ` +
@@ -833,6 +1311,10 @@ export function DataWorkspace() {
     {
       id: "preview",
       label: "Preview",
+    },
+    {
+      id: "charts",
+      label: "Charts",
     },
     {
       id: "insights",
@@ -1137,8 +1619,8 @@ export function DataWorkspace() {
 
                   <p className="mt-1 text-xs leading-5 text-slate-400">
                     These are deterministic suggestions from the CSV
-                    profile. Actual chart rendering will be added in
-                    the charting phase.
+                    profile. Use a suggestion to prefill the Chart
+                    Builder, review the fields, and generate it.
                   </p>
                 </div>
 
@@ -1195,6 +1677,18 @@ export function DataWorkspace() {
                               suggestion.reason
                             }
                           </p>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              applyChartSuggestion(
+                                suggestion,
+                              )
+                            }
+                            className="mt-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-amber-300/30 hover:bg-amber-300/10 hover:text-amber-100"
+                          >
+                            Use this chart
+                          </button>
                         </div>
                       ),
                     )}
@@ -1338,6 +1832,357 @@ export function DataWorkspace() {
                       )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          ) : null}
+
+          {profile &&
+          activeTab ===
+            "charts" ? (
+            <div className="space-y-5 p-4 sm:p-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">
+                  Visualization
+                </p>
+
+                <h3 className="mt-2 text-base font-semibold text-white">
+                  Chart Builder
+                </h3>
+
+                <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-400">
+                  Choose how to visualize the uploaded dataset.
+                  All chart values are validated and prepared by
+                  the backend before being rendered.
+                </p>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+                {/* Controls */}
+                <div className="space-y-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div>
+                    <label
+                      htmlFor="chart-type"
+                      className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+                    >
+                      Chart type
+                    </label>
+
+                    <select
+                      id="chart-type"
+                      value={
+                        chartType
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        handleChartTypeChange(
+                          event.target
+                            .value as ChartType,
+                        )
+                      }
+                      disabled={
+                        buildingChart
+                      }
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-amber-300/30"
+                    >
+                      <option value="line">
+                        Line
+                      </option>
+
+                      <option value="bar">
+                        Bar
+                      </option>
+
+                      <option value="area">
+                        Area
+                      </option>
+
+                      <option value="scatter">
+                        Scatter
+                      </option>
+
+                      <option value="table">
+                        Table
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="chart-x"
+                      className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+                    >
+                      {chartType ===
+                      "scatter"
+                        ? "X-axis (numeric)"
+                        : "X-axis"}
+                    </label>
+
+                    <select
+                      id="chart-x"
+                      value={
+                        chartX
+                      }
+                      onChange={(
+                        event,
+                      ) => {
+                        setChartX(
+                          event.target
+                            .value,
+                        );
+
+                        setChartSpec(
+                          null,
+                        );
+                      }}
+                      disabled={
+                        buildingChart
+                      }
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-amber-300/30"
+                    >
+                      <option value="">
+                        Select column
+                      </option>
+
+                      {(chartType ===
+                      "scatter"
+                        ? numericColumnNames
+                        : allColumnNames
+                      ).map(
+                        (
+                          column,
+                        ) => (
+                          <option
+                            key={
+                              column
+                            }
+                            value={
+                              column
+                            }
+                          >
+                            {
+                              column
+                            }
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      {chartType ===
+                      "scatter"
+                        ? "Y-axis"
+                        : chartType ===
+                            "table"
+                          ? "Additional columns"
+                          : "Series"}
+                    </p>
+
+                    <div className="mt-2 space-y-2">
+                      {selectableSeriesColumns.length ? (
+                        selectableSeriesColumns.map(
+                          (
+                            column,
+                          ) => {
+                            const checked =
+                              chartSeries.includes(
+                                column,
+                              );
+
+                            return (
+                              <label
+                                key={
+                                  column
+                                }
+                                className={[
+                                  "flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition",
+                                  checked
+                                    ? "border-cyan-300/30 bg-cyan-300/10"
+                                    : "border-white/10 bg-white/[0.03] hover:border-white/20",
+                                ].join(
+                                  " ",
+                                )}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type={
+                                      chartType ===
+                                      "scatter"
+                                        ? "radio"
+                                        : "checkbox"
+                                    }
+                                    name={
+                                      chartType ===
+                                      "scatter"
+                                        ? "scatter-series"
+                                        : undefined
+                                    }
+                                    checked={
+                                      checked
+                                    }
+                                    onChange={() =>
+                                      toggleChartSeries(
+                                        column,
+                                      )
+                                    }
+                                    disabled={
+                                      buildingChart
+                                    }
+                                    className="accent-cyan-300"
+                                  />
+
+                                  <span className="text-xs font-semibold text-slate-200">
+                                    {
+                                      column
+                                    }
+                                  </span>
+                                </div>
+
+                                <span className="rounded-full border border-cyan-300/15 bg-cyan-300/5 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-100">
+                                  {chartType ===
+                                  "table"
+                                    ? "column"
+                                    : "numeric"}
+                                </span>
+                              </label>
+                            );
+                          },
+                        )
+                      ) : (
+                        <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-xs text-slate-500">
+                          {chartType ===
+                          "table"
+                            ? "No additional columns are available."
+                            : "No numeric columns were detected."}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="chart-title"
+                      className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+                    >
+                      Custom title
+                    </label>
+
+                    <input
+                      id="chart-title"
+                      value={
+                        chartTitle
+                      }
+                      onChange={(
+                        event,
+                      ) => {
+                        setChartTitle(
+                          event.target
+                            .value,
+                        );
+
+                        setChartSpec(
+                          null,
+                        );
+                      }}
+                      placeholder="Optional"
+                      disabled={
+                        buildingChart
+                      }
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-amber-300/30"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={
+                      handleBuildChart
+                    }
+                    disabled={
+                      buildingChart ||
+                      !datasetId
+                    }
+                    className="w-full rounded-xl bg-amber-300 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {buildingChart
+                      ? "Building chart..."
+                      : "Generate chart"}
+                  </button>
+
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Trust model
+                    </p>
+
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      The language model does not generate
+                      plotting values. Chart data comes from
+                      the deterministic dataset pipeline.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Chart */}
+                <div className="min-w-0">
+                  {chartSpec ? (
+                    <ChartRenderer
+                      spec={
+                        chartSpec
+                      }
+                      height={420}
+                    />
+                  ) : (
+                    <div className="flex min-h-[500px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-black/10 p-8 text-center">
+                      <div className="max-w-md">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-lg font-semibold text-amber-100">
+                          CH
+                        </div>
+
+                        <h4 className="mt-4 text-base font-semibold text-white">
+                          Build a visualization
+                        </h4>
+
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                          Select a chart type, X-axis, and numeric
+                          fields. The backend will validate the
+                          request and return chart-ready data.
+                        </p>
+
+                        {chartX ||
+                        chartSeries.length ? (
+                          <div className="mt-4 flex flex-wrap justify-center gap-2">
+                            {chartX ? (
+                              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-slate-300">
+                                X:{" "}
+                                {
+                                  chartX
+                                }
+                              </span>
+                            ) : null}
+
+                            {chartSeries.map(
+                              (
+                                series,
+                              ) => (
+                                <span
+                                  key={
+                                    series
+                                  }
+                                  className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[10px] text-cyan-100"
+                                >
+                                  {
+                                    series
+                                  }
+                                </span>
+                              ),
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : null}
