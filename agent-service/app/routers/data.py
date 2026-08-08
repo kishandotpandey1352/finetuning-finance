@@ -24,6 +24,16 @@ from app.tools.csv_profile import (
     profile_csv_dataset,
 )
 
+from app.schemas.chart import (
+    ChartRequest,
+    ChartSpecResponse,
+)
+
+from app.tools.chart_planner import (
+    ChartBuildError,
+    build_chart_spec,
+)
+
 
 router = APIRouter(
     prefix="/data",
@@ -139,6 +149,56 @@ def profile_csv(
     except DatasetAccessError as error:
         raise HTTPException(
             status_code=403,
+            detail=str(error),
+        ) from error
+
+    except InvalidCsvError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+
+    except CsvStoreError as error:
+        raise HTTPException(
+            status_code=500,
+            detail=str(error),
+        ) from error
+
+@router.post(
+    "/chart",
+    response_model=ChartSpecResponse,
+)
+def create_chart(
+    request: ChartRequest,
+    x_user_id: str | None = Header(
+        default=None
+    ),
+):
+    user_id = get_user_id(
+        x_user_id
+    )
+
+    try:
+        return build_chart_spec(
+            user_id=user_id,
+            request=request,
+        )
+
+    except DatasetNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+
+    except DatasetAccessError as error:
+        raise HTTPException(
+            status_code=403,
+            detail=str(error),
+        ) from error
+
+    except ChartBuildError as error:
+        raise HTTPException(
+            status_code=400,
             detail=str(error),
         ) from error
 
