@@ -323,7 +323,36 @@ class FinancialFact(
         FactValidationStatus
     )
 
-    validation_reason: str | None = None
+    validation_reason: (
+        str | None
+    ) = None
+
+    canonical_metric_key: (
+        str | None
+    ) = None
+
+    normalized_numeric_value: (
+        Decimal | None
+    ) = None
+
+    normalization_multiplier: (
+        Decimal | None
+    ) = None
+
+    validation_score: (
+        float | None
+    ) = None
+
+    validation_details: dict[
+        str,
+        Any,
+    ] = Field(
+        default_factory=dict,
+    )
+
+    validated_at: (
+        datetime | None
+    ) = None
 
     created_at: datetime
 
@@ -566,6 +595,76 @@ class FinancialFactExtractionResult(
 
     saved_facts: list[
         FinancialFactBundle
+    ] = Field(
+        default_factory=list,
+    )
+
+    warnings: list[str] = Field(
+        default_factory=list,
+    )
+
+# ---------------------------------------------------------
+# Phase 3G-C
+# Fact validation / normalization
+# ---------------------------------------------------------
+
+
+class FinancialFactValidationResult(
+    BaseModel,
+):
+    fact_id: str
+
+    metric_key: str
+
+    canonical_metric_key: str
+
+    status: FactValidationStatus
+
+    validation_score: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+
+    reason: str
+
+    normalized_numeric_value: (
+        Decimal | None
+    ) = None
+
+    normalization_multiplier: (
+        Decimal | None
+    ) = None
+
+    currency: str | None = None
+
+    scale: str | None = None
+
+    period_start: date | None = None
+
+    period_end: date | None = None
+
+    warnings: list[str] = Field(
+        default_factory=list,
+    )
+
+
+class FinancialFactValidationResponse(
+    BaseModel,
+):
+    ok: bool = True
+
+    document_id: str
+
+    processed_count: int = 0
+
+    validated_count: int = 0
+
+    rejected_count: int = 0
+
+    conflict_count: int = 0
+
+    results: list[
+        FinancialFactValidationResult
     ] = Field(
         default_factory=list,
     )
