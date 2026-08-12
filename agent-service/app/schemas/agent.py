@@ -17,6 +17,12 @@ class AgentAnalyzeRequest(BaseModel):
 
     # Phase 3F
     chart_request: ChartRequest | None = None
+    allow_web_fallback: bool = False
+
+    trusted_web_domains: list[str] = Field(
+        default_factory=list,
+        max_length=25,
+    )
 
     metadata: dict[str, Any] = Field(default_factory=dict)
     
@@ -34,5 +40,10 @@ class AgentAnalyzeResponse(BaseModel):
 
     tool_plan: dict[str, Any] | None = None
     tool_results: list[dict[str, Any]] = Field(default_factory=list)
+    web_fallback_used: bool = False
+
+    web_fallback_available: bool = False
+
+    web_fallback_reason: str | None = None
 
     grounding: dict[str, Any] | None = None

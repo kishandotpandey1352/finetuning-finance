@@ -33,4 +33,14 @@ class FinanceAgentState(
     answer: str
     model: str
 
+    allow_web_fallback: bool
+
+    trusted_web_domains: list[str]
+
+    web_fallback_used: bool
+
+    web_fallback_available: bool
+
+    web_fallback_reason: str | None
+
     grounding: dict[str, Any]
