@@ -3,6 +3,7 @@ from app.schemas.tools import (
     CsvProfileInput,
     DocumentSearchInput,
     FinancialCalculatorInput,
+    FinancialFactExtractorInput,
     ToolDefinition,
     ToolName,
     ToolRiskLevel,
@@ -14,6 +15,9 @@ from app.tools.memory import memory_lookup_tool
 from app.tools.csv_profile import profile_csv_dataset
 from app.schemas.chart import ChartRequest
 from app.tools.chart_planner import build_chart_spec
+from app.tools.financial_fact_extractor import (
+    financial_fact_extractor_tool,
+)
 
 TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
     ToolName.memory_lookup: ToolDefinition(
@@ -79,8 +83,40 @@ TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
         requires_confirmation=False,
         allowed_in_background=True,
     ),
+
+    ToolName.financial_fact_extractor:ToolDefinition(
+        name=(
+            ToolName
+            .financial_fact_extractor
+        ),
+        description=(
+            "Retrieve or extract "
+            "source-backed validated "
+            "financial facts from "
+            "selected documents."
+        ),
+        risk_level=(
+            ToolRiskLevel.medium
+        ),
+        requires_confirmation=False,
+        allowed_in_background=True,
+    ),
 }
 
+
+def run_financial_fact_extractor(
+    user_id: str,
+    tool_input: FinancialFactExtractorInput,
+) -> dict:
+    return (
+        financial_fact_extractor_tool(
+            user_id=user_id,
+            tool_input=tool_input,
+        )
+        .model_dump(
+            mode="json"
+        )
+    )
 
 def list_tool_definitions() -> list[ToolDefinition]:
     return list(TOOL_REGISTRY.values())

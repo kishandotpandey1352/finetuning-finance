@@ -10,10 +10,113 @@ from app.schemas.tools import (
 )
 from app.schemas.tools import DocumentSearchInput
 from app.schemas.chart import ChartRequest
+from app.schemas.tools import (
+    FinancialFactExtractorInput,
+)
 
 NUMBER_PATTERN = re.compile(
     r"-?\d+(?:\.\d+)?"
 )
+
+# These are routing cues only.
+#
+# They do NOT define the universe of allowed financial
+# metrics. The extractor remains dynamically typed.
+
+FINANCIAL_FACT_SIGNALS = (
+    "revenue",
+    "sales",
+    "income",
+    "earnings",
+    "eps",
+    "ebitda",
+    "cash",
+    "debt",
+    "asset",
+    "liability",
+    "equity",
+    "margin",
+    "ratio",
+    "rate",
+    "expense",
+    "premium",
+    "cash flow",
+    "capex",
+    "free cash flow",
+    "backlog",
+    "booking",
+    "arr",
+    "subscriber",
+    "customer",
+    "occupancy",
+    "production",
+    "volume",
+    "store",
+    "employee",
+    "financial metric",
+    "financial metrics",
+    "kpi",
+    "key metric",
+)
+
+
+QUANTITATIVE_INTENT_SIGNALS = (
+    "what was",
+    "what were",
+    "how much",
+    "how many",
+    "value",
+    "values",
+    "amount",
+    "trend",
+    "compare",
+    "comparison",
+    "year over year",
+    "year-over-year",
+    "quarter",
+    "quarterly",
+    "annual",
+    "by year",
+    "by quarter",
+    "extract",
+)
+
+
+def _should_use_financial_fact_extractor(
+    question: str,
+) -> bool:
+    lowered = (
+        question.lower()
+    )
+
+    has_financial_signal = any(
+        signal in lowered
+        for signal
+        in FINANCIAL_FACT_SIGNALS
+    )
+
+    has_quantitative_intent = any(
+        signal in lowered
+        for signal
+        in QUANTITATIVE_INTENT_SIGNALS
+    )
+
+    # A year or explicit numeric comparison is also
+    # a useful structured-finance routing signal.
+    contains_year = bool(
+        re.search(
+            r"\b20\d{2}\b",
+            lowered,
+        )
+    )
+
+    return (
+        has_financial_signal
+        and (
+            has_quantitative_intent
+            or contains_year
+        )
+    )
 
 
 def _extract_numbers(
@@ -30,6 +133,44 @@ def plan_tools_node(
     state: FinanceAgentState,
 ) -> FinanceAgentState:
     question = state["question"]
+
+    document_ids = (
+        state.get(
+            "document_ids"
+        )
+        or []
+    )
+
+    use_documents = bool(
+        state.get(
+            "use_documents",
+            False,
+        )
+    )
+
+    use_financial_fact_extractor = (
+        use_documents
+        and bool(
+            document_ids
+        )
+        and _should_use_financial_fact_extractor(
+            question
+        )
+    )
+
+    financial_fact_extractor_input = (
+        FinancialFactExtractorInput(
+            document_ids=(
+                document_ids[:3]
+            ),
+            query=question,
+            requested_metrics=[],
+            max_facts_per_document=60,
+            max_returned_facts=40,
+        )
+        if use_financial_fact_extractor
+        else None
+    )
 
     lowered = question.lower()
 
@@ -268,6 +409,13 @@ def plan_tools_node(
 
             reason=" ".join(
                 reason_parts
+            ),
+            use_financial_fact_extractor=(
+                use_financial_fact_extractor
+            ),
+
+            financial_fact_extractor_input=(
+                financial_fact_extractor_input
             ),
         )
     }

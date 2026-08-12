@@ -5,6 +5,7 @@ from app.tools.registry import (
     run_document_search,
     run_financial_calculator,
     run_memory_lookup,
+    run_financial_fact_extractor
 )
 
 from app.tools.registry import (
@@ -80,6 +81,73 @@ def run_tools_node(state: FinanceAgentState) -> FinanceAgentState:
                     status=ToolCallStatus.failed,
                     input=document_search_input.model_dump(mode="json"),
                     error=str(error),
+                )
+            )
+
+    if (
+        tool_plan
+        .use_financial_fact_extractor
+        and tool_plan
+        .financial_fact_extractor_input
+    ):
+        fact_input = (
+            tool_plan
+            .financial_fact_extractor_input
+        )
+
+        try:
+            fact_output = (
+                run_financial_fact_extractor(
+                    state[
+                        "user_id"
+                    ],
+                    fact_input,
+                )
+            )
+
+            tool_results.append(
+                ToolCallRecord(
+                    tool_name=(
+                        ToolName
+                        .financial_fact_extractor
+                    ),
+                    status=(
+                        ToolCallStatus
+                        .completed
+                    ),
+                    input=(
+                        fact_input
+                        .model_dump(
+                            mode="json"
+                        )
+                    ),
+                    output=(
+                        fact_output
+                    ),
+                )
+            )
+
+        except Exception as error:
+            tool_results.append(
+                ToolCallRecord(
+                    tool_name=(
+                        ToolName
+                        .financial_fact_extractor
+                    ),
+                    status=(
+                        ToolCallStatus
+                        .failed
+                    ),
+                    input=(
+                        fact_input
+                        .model_dump(
+                            mode="json"
+                        )
+                    ),
+                    error=(
+                        f"{type(error).__name__}: "
+                        f"{error}"
+                    ),
                 )
             )
     # ---------------------------------------------------------

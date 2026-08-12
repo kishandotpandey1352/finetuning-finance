@@ -35,29 +35,87 @@ def _format_tool_results(state: FinanceAgentState) -> str:
     )
 
 
-def _get_document_sources(
+def _get_grounding_sources(
     state: FinanceAgentState,
 ) -> list[dict]:
-    """
-    Extract document sources returned by the document_search tool.
+    sources: list[dict] = []
 
-    The document_search tool stores retrieved chunks inside:
-        ToolCallRecord.output["sources"]
-
-    Only successfully completed document searches are considered.
-    """
-    for result in state.get("tool_results", []):
+    for result in (
+        state.get(
+            "tool_results",
+            [],
+        )
+    ):
         if (
-            result.tool_name.value == "document_search"
-            and result.status.value == "completed"
+            result.status.value
+            != "completed"
         ):
-            output = result.output or {}
-            sources = output.get("sources", [])
+            continue
 
-            if isinstance(sources, list):
-                return sources
+        if (
+            result.tool_name.value
+            == "document_search"
+        ):
+            sources.extend(
+                result.output.get(
+                    "sources",
+                    [],
+                )
+            )
 
-    return []
+            continue
+
+        if (
+            result.tool_name.value
+            == "financial_fact_extractor"
+        ):
+            for source in (
+                result.output.get(
+                    "sources",
+                    [],
+                )
+            ):
+                sources.append(
+                    {
+                        "source_number":
+                            source.get(
+                                "source_number"
+                            ),
+
+                        "document_id":
+                            source.get(
+                                "document_id"
+                            ),
+
+                        "chunk_id":
+                            source.get(
+                                "chunk_id"
+                            ),
+
+                        "file_name":
+                            source.get(
+                                "source_title"
+                            ),
+
+                        "page_number":
+                            source.get(
+                                "page_number"
+                            ),
+
+                        "score":
+                            source.get(
+                                "retrieval_score"
+                            ),
+
+                        "snippet":
+                            source.get(
+                                "source_snippet",
+                                "",
+                            ),
+                    }
+                )
+
+    return sources
 
 
 def _format_document_sources(
@@ -118,7 +176,11 @@ def generate_answer_node(
         False,
     )
 
-    document_sources = _get_document_sources(state)
+    document_sources = (
+            _get_grounding_sources(
+                state
+            )
+        )
 
     formatted_document_sources = _format_document_sources(
         document_sources
@@ -156,6 +218,35 @@ CSV analysis rules:
 - Do not treat CSV data as RAG/document evidence.
 - When chart suggestions exist, present them as suggestions rather than claiming a chart has already been rendered.
 - If the csv_profile tool failed, explain that the dataset could not be analyzed instead of guessing.
+
+FINANCIAL FACT RULES:
+
+If the financial_fact_extractor tool completed:
+
+- The "facts" array contains only facts that passed
+  deterministic financial fact validation.
+- Rejected and conflict facts are NOT included in
+  the facts array and must not be used as financial
+  evidence.
+- Never infer values from rejected_count or
+  conflict_count.
+- Prefer canonical_metric_key when reasoning about
+  whether multiple facts represent the same metric.
+- Preserve the reported period.
+- Preserve the reported raw_value when explaining
+  what the source stated.
+- normalized_numeric_value may be used for
+  deterministic comparisons/calculations when present.
+- Do not invent currency or scale when they are null.
+- Every financial fact has a source_number.
+- Cite financial fact claims using the matching
+  [Source N] value returned by the tool.
+- Financial fact source numbers begin at 1001 so they
+  do not collide with normal document-search sources.
+- If the requested metric has no validated fact,
+  say that the available document evidence was not
+  sufficient to produce a validated structured fact.
+- Never substitute a conflict fact with your own guess.
 
 Confirmed user preferences:
 {memory_context}
