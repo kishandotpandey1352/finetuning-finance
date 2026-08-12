@@ -81,3 +81,80 @@ export type DocumentFinancialFactsResponse = {
 
   facts: FinancialFact[];
 };
+
+
+export type FinancialFactChartSource = {
+  source_ledger_id: string;
+
+  document_id: string | null;
+  chunk_id: string | null;
+
+  source_title: string | null;
+  page_number: number | null;
+
+  source_snippet: string | null;
+  retrieval_score: number | null;
+};
+
+
+export type FinancialFactChartPoint = {
+  fact_id: string;
+
+  period_label: string;
+
+  period_start: string | null;
+  period_end: string | null;
+
+  value: number;
+
+  numeric_value: string;
+
+  normalized_numeric_value:
+    string | null;
+
+  raw_value: string | null;
+
+  validation_score:
+    number | null;
+
+  source:
+    FinancialFactChartSource
+    | null;
+};
+
+
+export type FinancialFactChartResponse = {
+  ok: boolean;
+
+  document_id: string;
+
+  metric_key: string;
+  metric_label: string;
+
+  value_type: string;
+
+  company: string | null;
+
+  category: string | null;
+
+  statement_type: string | null;
+
+  currency: string | null;
+
+  unit_label: string | null;
+
+  source_scales: string[];
+
+  chart_type:
+    | "line"
+    | "bar";
+
+  x_axis_label: string;
+
+  y_axis_label: string;
+
+  points:
+    FinancialFactChartPoint[];
+
+  warnings: string[];
+};

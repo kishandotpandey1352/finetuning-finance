@@ -18,6 +18,17 @@ from app.services.fact_query_service import (
     list_document_facts,
 )
 
+from typing import Literal
+
+from app.schemas.fact_charts import (
+    FinancialFactChartResponse,
+)
+
+from app.services.fact_chart_service import (
+    FactChartError,
+    build_document_fact_chart,
+)
+
 
 router = APIRouter(
     prefix="/facts",
@@ -97,6 +108,83 @@ def get_document_facts(
             detail=(
                 "Unable to load financial "
                 f"facts: {type(error).__name__}: "
+                f"{error}"
+            ),
+        ) from error
+@router.get(
+    "/documents/{document_id}/chart",
+    response_model=(
+        FinancialFactChartResponse
+    ),
+)
+def get_document_fact_chart(
+    document_id: str,
+    metric_key: str = Query(
+        min_length=1,
+        max_length=300,
+    ),
+    chart_type: Literal[
+        "auto",
+        "line",
+        "bar",
+    ] = Query(
+        default="auto",
+    ),
+    company: str | None = Query(
+        default=None,
+    ),
+    category: str | None = Query(
+        default=None,
+    ),
+    statement_type: str | None = Query(
+        default=None,
+    ),
+    x_user_id: Annotated[
+        str | None,
+        Header(
+            alias="X-User-Id"
+        ),
+    ] = None,
+) -> FinancialFactChartResponse:
+    user_id = (
+        x_user_id
+        or "local-demo-user"
+    )
+
+    try:
+        return (
+            build_document_fact_chart(
+                user_id=user_id,
+                document_id=(
+                    document_id
+                ),
+                metric_key=(
+                    metric_key
+                ),
+                chart_type=(
+                    chart_type
+                ),
+                company=company,
+                category=category,
+                statement_type=(
+                    statement_type
+                ),
+            )
+        )
+
+    except FactChartError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Unable to build "
+                "financial fact chart: "
+                f"{type(error).__name__}: "
                 f"{error}"
             ),
         ) from error

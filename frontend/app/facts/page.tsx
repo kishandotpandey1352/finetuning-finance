@@ -9,6 +9,10 @@ import {
 } from "@/components/financial-facts/FinancialFactTable";
 
 
+import {
+  FinancialFactChartBuilder,
+} from "@/components/financial-facts/FinancialFactChartBuilder";
+
 export default function FactsPage() {
   const [
     input,
@@ -100,12 +104,20 @@ export default function FactsPage() {
 
 
       {documentId && (
-        <FinancialFactTable
-          documentId={
-            documentId
-          }
-        />
-      )}
+        <div className="space-y-6">
+          <FinancialFactChartBuilder
+            documentId={
+              documentId
+            }
+          />
+
+          <FinancialFactTable
+            documentId={
+              documentId
+            }
+          />
+        </div>
+        )}
     </main>
   );
 }
