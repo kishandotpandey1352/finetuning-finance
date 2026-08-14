@@ -19,6 +19,14 @@ from app.tools.financial_fact_extractor import (
     financial_fact_extractor_tool,
 )
 
+from app.schemas.web import (
+    WebResearchInput,
+)
+
+from app.tools.web_research import (
+    web_research_tool,
+)
+
 TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
     ToolName.memory_lookup: ToolDefinition(
         name=ToolName.memory_lookup,
@@ -94,6 +102,23 @@ TOOL_REGISTRY: dict[ToolName, ToolDefinition] = {
             "source-backed validated "
             "financial facts from "
             "selected documents."
+        ),
+        risk_level=(
+            ToolRiskLevel.medium
+        ),
+        requires_confirmation=False,
+        allowed_in_background=True,
+    ),
+    ToolName.web_research:
+    ToolDefinition(
+        name=ToolName.web_research,
+        description=(
+            "Search public web results "
+            "using Serper only after "
+            "uploaded-document evidence "
+            "has been determined to be "
+            "insufficient and web fallback "
+            "was explicitly allowed."
         ),
         risk_level=(
             ToolRiskLevel.medium
@@ -186,4 +211,18 @@ def run_chart_planner(
         request=tool_input,
     ).model_dump(
         mode="json"
+    )
+
+def run_web_research(
+    user_id: str,
+    tool_input: WebResearchInput,
+) -> dict:
+    return (
+        web_research_tool(
+            user_id=user_id,
+            tool_input=tool_input,
+        )
+        .model_dump(
+            mode="json"
+        )
     )

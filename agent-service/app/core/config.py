@@ -67,6 +67,20 @@ class Settings(
         env_file_encoding="utf-8",
         extra="ignore",
     )
+    # Serper API settings for web search fallback.
+    serper_api_key: str | None = None
+
+    serper_search_enabled: bool = True
+
+    serper_search_url: str = (
+        "https://google.serper.dev/search"
+    )
+
+    serper_timeout_seconds: float = 12.0
+
+    serper_max_results: int = 8
+
+    serper_language: str = "en"
 
 
 settings = Settings()

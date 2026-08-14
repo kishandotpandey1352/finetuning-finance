@@ -23,6 +23,7 @@ class ToolName(str, Enum):
     # Phase 3F
     chart_planner = "chart_planner"
     financial_fact_extractor = ("financial_fact_extractor")
+    web_research = "web_research"
 
 
 class ToolCallStatus(str, Enum):

@@ -10,6 +10,10 @@ from app.services.web_gap_detector import (
     detect_web_gap,
 )
 
+from app.schemas.web import (
+    WebResearchInput,
+)
+
 from app.tools.registry import (
     run_chart_planner,
     run_csv_profile,
@@ -17,6 +21,7 @@ from app.tools.registry import (
     run_financial_calculator,
     run_financial_fact_extractor,
     run_memory_lookup,
+    run_web_research,
 )
 
 
@@ -418,18 +423,26 @@ def run_tools_node(
             )
 
     # ---------------------------------------------------------
-    # 7. Web fallback gap detection - Phase 3H-A
+    # 7. Web fallback - Phase 3H-B
     # ---------------------------------------------------------
     #
     # IMPORTANT:
     #
-    # All local tools have already completed before this
-    # decision is made.
+    # Every local tool has already completed before
+    # we evaluate web fallback.
     #
-    # 3H-A only DETECTS whether web fallback would be useful.
-    # It does NOT perform Serper/web research.
+    # Serper is allowed only when:
     #
-    # Actual web execution will be added in Phase 3H-B.
+    #   1. deterministic gap detection says local
+    #      evidence is insufficient
+    #
+    #   AND
+    #
+    #   2. the user explicitly enabled
+    #      allow_web_fallback.
+    #
+    # Serper results are discovery candidates only
+    # in 3H-B.
     # ---------------------------------------------------------
 
     gap = detect_web_gap(
@@ -443,16 +456,6 @@ def run_tools_node(
         tool_results=tool_results,
     )
 
-    # ---------------------------------------------------------
-    # Permission is already carried through state in 3H-A.
-    #
-    # We deliberately do not act on it yet.
-    # 3H-B will use:
-    #
-    # if gap.needs_web and allow_web_fallback:
-    #     run_serper(...)
-    # ---------------------------------------------------------
-
     allow_web_fallback = bool(
         state.get(
             "allow_web_fallback",
@@ -460,23 +463,113 @@ def run_tools_node(
         )
     )
 
-    # Keep the variable intentionally available for 3H-B.
-    _ = allow_web_fallback
+    web_fallback_used = False
 
-    # Web fallback is available whenever deterministic
-    # local-evidence analysis finds a gap.
     web_fallback_available = bool(
         gap.needs_web
     )
-
-    # 3H-A never executes web research.
-    web_fallback_used = False
 
     web_fallback_reason = (
         gap.reason
         if gap.needs_web
         else None
     )
+
+    # ---------------------------------------------------------
+    # Run Serper only after local evidence has failed.
+    # ---------------------------------------------------------
+
+    if (
+        gap.needs_web
+        and allow_web_fallback
+    ):
+        web_input = (
+            WebResearchInput(
+                query=(
+                    state["question"]
+                ),
+                gap_reason=(
+                    gap.reason
+                ),
+                trusted_domains=(
+                    state.get(
+                        "trusted_web_domains",
+                        [],
+                    )
+                    or []
+                ),
+                max_results=8,
+            )
+        )
+
+        try:
+            web_output = (
+                run_web_research(
+                    state["user_id"],
+                    web_input,
+                )
+            )
+
+            tool_results.append(
+                ToolCallRecord(
+                    tool_name=(
+                        ToolName
+                        .web_research
+                    ),
+                    status=(
+                        ToolCallStatus
+                        .completed
+                    ),
+                    input=(
+                        web_input
+                        .model_dump(
+                            mode="json"
+                        )
+                    ),
+                    output=(
+                        web_output
+                    ),
+                )
+            )
+
+            # A real web search was executed.
+            web_fallback_used = True
+
+            # The user no longer needs to be prompted
+            # to enable fallback for this request.
+            web_fallback_available = False
+
+        except Exception as error:
+            tool_results.append(
+                ToolCallRecord(
+                    tool_name=(
+                        ToolName
+                        .web_research
+                    ),
+                    status=(
+                        ToolCallStatus
+                        .failed
+                    ),
+                    input=(
+                        web_input
+                        .model_dump(
+                            mode="json"
+                        )
+                    ),
+                    error=(
+                        f"{type(error).__name__}: "
+                        f"{error}"
+                    ),
+                )
+            )
+
+            # Search failed, so we have not actually
+            # obtained usable web fallback results.
+            web_fallback_used = False
+
+            # Fallback is still conceptually available,
+            # although this particular attempt failed.
+            web_fallback_available = True
 
     # ---------------------------------------------------------
     # Return updated graph state
