@@ -141,6 +141,54 @@ class WebFetchFailure(BaseModel):
     reason: str
 
 
+# =========================================================
+# Phase 3H-D
+# Persistent citation source
+# =========================================================
+
+
+class WebCitationSource(BaseModel):
+    # Citation number is request-scoped.
+    #
+    # Database source IDs are persistent.
+    #
+    # Example:
+    #
+    # [Web Source 2001]
+    #
+    source_number: int = Field(
+        ge=2001,
+    )
+
+    source_id: str
+
+    source_type: Literal[
+        "web"
+    ] = "web"
+
+    title: str
+
+    url: str
+
+    domain: str
+
+    snippet: str
+
+    page_number: int | None = None
+
+    trust_tier: WebTrustTier
+
+    provider: Literal[
+        "serper"
+    ] = "serper"
+
+    content_type: WebContentKind
+
+    evidence_score: float | None = None
+
+    retrieved_at: str
+
+
 class WebResearchOutput(BaseModel):
     ok: bool = True
 
@@ -174,6 +222,20 @@ class WebResearchOutput(BaseModel):
 
     fetch_failures: list[
         WebFetchFailure
+    ] = Field(
+        default_factory=list,
+    )
+
+    # -----------------------------------------------------
+    # Phase 3H-D
+    # -----------------------------------------------------
+
+    citation_ready: bool = False
+
+    citation_source_count: int = 0
+
+    citation_sources: list[
+        WebCitationSource
     ] = Field(
         default_factory=list,
     )
