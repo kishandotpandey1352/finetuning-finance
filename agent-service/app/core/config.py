@@ -81,6 +81,46 @@ class Settings(
     serper_max_results: int = 8
 
     serper_language: str = "en"
+    # ---------------------------------------------------------
+    # Phase 3H-C - safe web source fetching
+    # ---------------------------------------------------------
+
+    web_fetch_enabled: bool = True
+
+    web_fetch_timeout_seconds: float = 12.0
+
+    web_fetch_max_redirects: int = 3
+
+    # Maximum number of candidate URLs we will attempt
+    # for one web fallback request.
+    web_fetch_max_candidates: int = 4
+
+    # Stop early after this many sources contain
+    # relevant fetched evidence.
+    web_fetch_target_sources: int = 3
+
+    # HTML/text responses are deliberately kept small.
+    web_fetch_max_html_bytes: int = 2_000_000
+
+    # PDFs may naturally be larger.
+    web_fetch_max_pdf_bytes: int = 12_000_000
+
+    # Protect pypdf from extremely large documents.
+    web_fetch_max_pdf_pages: int = 80
+
+    # Maximum extracted text retained internally.
+    web_fetch_max_text_chars: int = 500_000
+
+    # Evidence passed to later stages.
+    web_evidence_passages_per_source: int = 3
+
+    web_evidence_passage_chars: int = 1600
+
+    # Replace this with a real project/contact identity
+    # in .env, especially when accessing SEC.gov.
+    web_fetch_user_agent: str = (
+        "FinetuningFinance/0.1"
+    )
 
 
 settings = Settings()

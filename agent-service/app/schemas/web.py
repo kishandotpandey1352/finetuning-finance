@@ -8,6 +8,22 @@ from pydantic import (
 )
 
 
+WebTrustTier = Literal[
+    "public_authority",
+    "trusted_domain",
+    "finance_candidate",
+    "general_web",
+    "low_trust",
+]
+
+
+WebContentKind = Literal[
+    "html",
+    "text",
+    "pdf",
+]
+
+
 class WebGapDecision(BaseModel):
     needs_web: bool = False
 
@@ -68,15 +84,61 @@ class WebSearchCandidate(BaseModel):
 
     snippet: str | None = None
 
-    trust_tier: Literal[
-        "public_authority",
-        "trusted_domain",
-        "finance_candidate",
-        "general_web",
-        "low_trust",
-    ]
+    trust_tier: WebTrustTier
 
     ranking_score: float
+
+
+class WebEvidencePassage(BaseModel):
+    text: str
+
+    score: float
+
+    page_number: int | None = None
+
+    matched_terms: list[str] = Field(
+        default_factory=list,
+    )
+
+
+class WebFetchedSource(BaseModel):
+    search_rank: int
+
+    title: str
+
+    requested_url: str
+
+    final_url: str
+
+    domain: str
+
+    content_type: WebContentKind
+
+    trust_tier: WebTrustTier
+
+    http_status: int
+
+    text_chars: int = 0
+
+    evidence_passages: list[
+        WebEvidencePassage
+    ] = Field(
+        default_factory=list,
+    )
+
+    warnings: list[str] = Field(
+        default_factory=list,
+    )
+
+
+class WebFetchFailure(BaseModel):
+    search_rank: int
+
+    title: str
+
+    url: str
+
+    reason: str
 
 
 class WebResearchOutput(BaseModel):
@@ -94,6 +156,24 @@ class WebResearchOutput(BaseModel):
 
     candidates: list[
         WebSearchCandidate
+    ] = Field(
+        default_factory=list,
+    )
+
+    fetched_source_count: int = 0
+
+    evidence_source_count: int = 0
+
+    evidence_ready: bool = False
+
+    fetched_sources: list[
+        WebFetchedSource
+    ] = Field(
+        default_factory=list,
+    )
+
+    fetch_failures: list[
+        WebFetchFailure
     ] = Field(
         default_factory=list,
     )
