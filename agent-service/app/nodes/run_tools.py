@@ -484,23 +484,40 @@ def run_tools_node(
         and allow_web_fallback
     ):
         web_input = (
-            WebResearchInput(
-                query=(
-                    state["question"]
-                ),
-                gap_reason=(
-                    gap.reason
-                ),
-                trusted_domains=(
-                    state.get(
-                        "trusted_web_domains",
-                        [],
-                    )
-                    or []
-                ),
-                max_results=8,
+                WebResearchInput(
+                    query=(
+                        state["question"]
+                    ),
+
+                    gap_reason=(
+                        gap.reason
+                    ),
+
+                    trusted_domains=(
+                        state.get(
+                            "trusted_web_domains",
+                            [],
+                        )
+                        or []
+                    ),
+
+                    max_results=8,
+
+                    # ---------------------------------------------
+                    # Phase 3H-E
+                    #
+                    # Only ask the web pipeline for structured
+                    # financial facts if the existing planner
+                    # already classified the question as one
+                    # requiring the financial fact extractor.
+                    # ---------------------------------------------
+
+                    extract_structured_facts=bool(
+                        tool_plan
+                        .use_financial_fact_extractor
+                    ),
+                )
             )
-        )
 
         try:
             web_output = (

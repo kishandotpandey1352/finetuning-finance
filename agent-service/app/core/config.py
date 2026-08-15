@@ -122,5 +122,19 @@ class Settings(
         "FinetuningFinance/0.1"
     )
 
+        # ---------------------------------------------------------
+    # Phase 3H-E - Structured web financial facts
+    # ---------------------------------------------------------
+
+    web_fact_extraction_enabled: bool = True
+
+    web_fact_extraction_model: str | None = None
+
+    web_fact_extraction_max_sources: int = 6
+
+    web_fact_extraction_max_facts: int = 30
+
+    web_fact_extraction_max_context_chars: int = 30000
+
 
 settings = Settings()

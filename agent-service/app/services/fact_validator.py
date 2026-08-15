@@ -2889,3 +2889,335 @@ def validate_document_facts(
             ),
         )
     )
+
+
+# ============================================================
+# Phase 3H-E
+# Web financial fact validation
+# ============================================================
+
+
+def validate_web_facts(
+    *,
+    user_id: str,
+    fact_ids: list[str],
+    revalidate: bool = False,
+):
+    """
+    Validate structured facts derived from persisted
+    web evidence.
+
+    The actual deterministic evidence assessment is the
+    same implementation used for document facts.
+
+    Web facts differ only in loading:
+    - document_id is None
+    - source_type must be web
+    - source text comes from source_ledger.source_snippet
+    """
+
+    from app.schemas.web import (
+        WebFactValidationResponse,
+        WebFactValidationResult,
+    )
+
+    if not fact_ids:
+        return WebFactValidationResponse(
+            processed_count=0,
+            validated_count=0,
+            rejected_count=0,
+            conflict_count=0,
+            results=[],
+        )
+
+    client = (
+        _get_supabase_client()
+    )
+
+    query = (
+        client
+        .table(
+            "analysis_facts"
+        )
+        .select("*")
+        .eq(
+            "user_id",
+            user_id,
+        )
+        .in_(
+            "id",
+            fact_ids,
+        )
+    )
+
+    if not revalidate:
+        query = query.eq(
+            "validation_status",
+            (
+                FactValidationStatus
+                .pending
+                .value
+            ),
+        )
+
+    response = (
+        query
+        .order(
+            "created_at"
+        )
+        .execute()
+    )
+
+    fact_rows = (
+        response.data
+        or []
+    )
+
+    if not fact_rows:
+        return WebFactValidationResponse(
+            processed_count=0,
+            validated_count=0,
+            rejected_count=0,
+            conflict_count=0,
+            results=[],
+            warnings=[
+                (
+                    "No pending structured "
+                    "web facts were found."
+                )
+            ],
+        )
+
+    source_ids = list(
+        {
+            str(
+                row[
+                    "source_ledger_id"
+                ]
+            )
+            for row
+            in fact_rows
+            if row.get(
+                "source_ledger_id"
+            )
+        }
+    )
+
+    source_map = (
+        _load_sources(
+            client=client,
+            user_id=user_id,
+            source_ids=source_ids,
+        )
+    )
+
+    assessments: list[
+        FactAssessment
+    ] = []
+
+    for fact_row in fact_rows:
+        source = (
+            source_map.get(
+                str(
+                    fact_row.get(
+                        "source_ledger_id"
+                    )
+                )
+            )
+        )
+
+        source_text = ""
+
+        if source:
+            source_text = str(
+                source.get(
+                    "source_snippet",
+                    "",
+                )
+            )
+
+        assessment = (
+            _assess_fact(
+                fact_row=fact_row,
+                source_row=source,
+                source_text=source_text,
+            )
+        )
+
+        # ------------------------------------------------
+        # Web-specific source integrity check
+        # ------------------------------------------------
+
+        if (
+            source
+            and source.get(
+                "source_type"
+            )
+            != "web"
+        ):
+            assessment.status = (
+                FactValidationStatus
+                .rejected
+            )
+
+            assessment.score = 0.0
+
+            assessment.reason = (
+                "Structured web fact was not "
+                "linked to a web source ledger "
+                "entry."
+            )
+
+            assessment.details[
+                "source_type_match"
+            ] = False
+
+        else:
+            assessment.details[
+                "source_type_match"
+            ] = True
+
+            assessment.details[
+                "source_type"
+            ] = "web"
+
+        assessments.append(
+            assessment
+        )
+
+    # Use the same canonicalization rules as 3G-C.
+    _canonicalize_metric_keys(
+        assessments
+    )
+
+    # Detect duplicate/conflicting web facts in
+    # the current extraction batch.
+    _apply_duplicate_and_conflict_rules(
+        assessments
+    )
+
+    persistence_warnings: list[
+        str
+    ] = []
+
+    for assessment in assessments:
+        try:
+            _update_assessment(
+                client=client,
+                user_id=user_id,
+                assessment=assessment,
+            )
+
+        except Exception as error:
+            persistence_warnings.append(
+                (
+                    "Unable to persist web "
+                    "fact validation for "
+                    f"{assessment.fact_row['id']}: "
+                    f"{type(error).__name__}: "
+                    f"{error}"
+                )
+            )
+
+    results = [
+        WebFactValidationResult(
+            fact_id=(
+                str(
+                    assessment
+                    .fact_row[
+                        "id"
+                    ]
+                )
+            ),
+
+            metric_key=(
+                str(
+                    assessment
+                    .fact_row.get(
+                        "metric_key",
+                        "",
+                    )
+                )
+            ),
+
+            canonical_metric_key=(
+                assessment
+                .canonical_metric_key
+            ),
+
+            status=(
+                assessment.status
+            ),
+
+            validation_score=(
+                assessment.score
+            ),
+
+            reason=(
+                assessment.reason
+            ),
+
+            warnings=list(
+                assessment.warnings
+            ),
+        )
+        for assessment
+        in assessments
+    ]
+
+    validated_count = sum(
+        1
+        for assessment
+        in assessments
+        if (
+            assessment.status
+            == FactValidationStatus
+            .validated
+        )
+    )
+
+    rejected_count = sum(
+        1
+        for assessment
+        in assessments
+        if (
+            assessment.status
+            == FactValidationStatus
+            .rejected
+        )
+    )
+
+    conflict_count = sum(
+        1
+        for assessment
+        in assessments
+        if (
+            assessment.status
+            == FactValidationStatus
+            .conflict
+        )
+    )
+
+    return WebFactValidationResponse(
+        processed_count=len(
+            assessments
+        ),
+
+        validated_count=(
+            validated_count
+        ),
+
+        rejected_count=(
+            rejected_count
+        ),
+
+        conflict_count=(
+            conflict_count
+        ),
+
+        results=results,
+
+        warnings=(
+            persistence_warnings
+        ),
+    )

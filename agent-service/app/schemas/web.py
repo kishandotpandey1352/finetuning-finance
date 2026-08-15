@@ -7,6 +7,14 @@ from pydantic import (
     Field,
 )
 
+from datetime import date
+from decimal import Decimal
+
+from app.schemas.facts import (
+    FactValidationStatus,
+    FactValueType,
+)
+
 
 WebTrustTier = Literal[
     "public_authority",
@@ -67,6 +75,8 @@ class WebResearchInput(BaseModel):
         ge=1,
         le=20,
     )
+
+    extract_structured_facts: bool = False
 
 
 class WebSearchCandidate(BaseModel):
@@ -188,6 +198,134 @@ class WebCitationSource(BaseModel):
 
     retrieved_at: str
 
+# =========================================================
+# Phase 3H-E
+# Structured web financial facts
+# =========================================================
+
+
+class WebFactExtractionResult(
+    BaseModel
+):
+    attempted: bool = False
+
+    model: str | None = None
+
+    candidate_count: int = 0
+
+    persisted_count: int = 0
+
+    skipped_count: int = 0
+
+    fact_ids: list[str] = Field(
+        default_factory=list,
+    )
+
+    warnings: list[str] = Field(
+        default_factory=list,
+    )
+
+
+class WebFactValidationResult(
+    BaseModel
+):
+    fact_id: str
+
+    metric_key: str
+
+    canonical_metric_key: str
+
+    status: FactValidationStatus
+
+    validation_score: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+
+    reason: str
+
+    warnings: list[str] = Field(
+        default_factory=list,
+    )
+
+
+class WebFactValidationResponse(
+    BaseModel
+):
+    ok: bool = True
+
+    processed_count: int = 0
+
+    validated_count: int = 0
+
+    rejected_count: int = 0
+
+    conflict_count: int = 0
+
+    results: list[
+        WebFactValidationResult
+    ] = Field(
+        default_factory=list,
+    )
+
+    warnings: list[str] = Field(
+        default_factory=list,
+    )
+
+
+class WebValidatedFinancialFact(
+    BaseModel
+):
+    fact_id: str
+
+    source_number: int = Field(
+        ge=2001,
+    )
+
+    source_ledger_id: str
+
+    company: str | None = None
+
+    metric_key: str
+
+    canonical_metric_key: str
+
+    metric_label: str
+
+    value_type: FactValueType
+
+    numeric_value: Decimal | None = None
+
+    normalized_numeric_value: (
+        Decimal | None
+    ) = None
+
+    text_value: str | None = None
+
+    raw_value: str
+
+    unit_key: str | None = None
+
+    unit_label: str | None = None
+
+    currency: str | None = None
+
+    scale: str | None = None
+
+    period_label: str | None = None
+
+    period_start: date | None = None
+
+    period_end: date | None = None
+
+    category: str | None = None
+
+    statement_type: str | None = None
+
+    validation_score: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
 
 class WebResearchOutput(BaseModel):
     ok: bool = True
@@ -243,3 +381,25 @@ class WebResearchOutput(BaseModel):
     warnings: list[str] = Field(
         default_factory=list,
     )
+
+    extract_structured_facts: bool = False
+
+    # -----------------------------------------------------
+    # Phase 3H-E
+    # -----------------------------------------------------
+
+    structured_fact_attempted: bool = False
+
+    structured_fact_ready: bool = False
+
+    structured_fact_candidate_count: int = 0
+
+    structured_fact_persisted_count: int = 0
+
+    structured_fact_validated_count: int = 0
+
+    structured_fact_rejected_count: int = 0
+
+    structured_fact_conflict_count: int = 0
+
+    validated_facts: list[WebValidatedFinancialFact] = Field(default_factory=list,)

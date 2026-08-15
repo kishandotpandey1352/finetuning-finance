@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from app.core.config import settings
 
 from app.schemas.web import (
@@ -5,8 +7,17 @@ from app.schemas.web import (
     WebResearchOutput,
 )
 
+from app.services.fact_validator import (
+    validate_web_facts,
+)
+
 from app.services.serper_search import (
     search_web_with_serper,
+)
+
+from app.services.web_fact_extractor import (
+    extract_web_financial_facts,
+    load_validated_web_facts,
 )
 
 from app.services.web_source_fetcher import (
@@ -23,10 +34,31 @@ def web_research_tool(
     user_id: str,
     tool_input: WebResearchInput,
 ) -> WebResearchOutput:
-    # -----------------------------------------------------
+    """
+    Execute the complete web-research pipeline.
+
+    Phase 3H-B:
+        Serper search discovery.
+
+    Phase 3H-C:
+        Safe source fetching and evidence extraction.
+
+    Phase 3H-D:
+        Persist verified evidence into source_ledger
+        and create request-scoped [Web Source N]
+        citations.
+
+    Phase 3H-E:
+        Optionally extract structured financial facts,
+        persist them as pending analysis_facts,
+        deterministically validate them, and expose only
+        validated facts.
+    """
+
+    # =====================================================
     # Phase 3H-B
     # Search discovery
-    # -----------------------------------------------------
+    # =====================================================
 
     search_output = (
         search_web_with_serper(
@@ -34,15 +66,17 @@ def web_research_tool(
         )
     )
 
+    # No search candidates means there is nothing further
+    # to fetch, persist, or structure.
     if not (
         search_output.candidates
     ):
         return search_output
 
-    # -----------------------------------------------------
+    # =====================================================
     # Phase 3H-C
     # Fetch actual source pages / PDFs
-    # -----------------------------------------------------
+    # =====================================================
 
     if not (
         settings.web_fetch_enabled
@@ -113,10 +147,10 @@ def web_research_tool(
             )
         )
 
-    # -----------------------------------------------------
+    # =====================================================
     # Phase 3H-D
-    # Persist actual evidence into source_ledger
-    # -----------------------------------------------------
+    # Persist verified evidence into source_ledger
+    # =====================================================
 
     citation_sources = []
 
@@ -124,7 +158,9 @@ def web_research_tool(
         try:
             citation_sources = (
                 persist_web_citation_sources(
-                    user_id=user_id,
+                    user_id=(
+                        user_id
+                    ),
                     fetched_sources=(
                         fetched_sources
                     ),
@@ -162,10 +198,189 @@ def web_research_tool(
             )
         )
 
+    # =====================================================
+    # Phase 3H-E
+    # Structured web financial facts
+    # =====================================================
+
+    structured_fact_attempted = False
+
+    structured_fact_candidate_count = 0
+
+    structured_fact_persisted_count = 0
+
+    structured_fact_validated_count = 0
+
+    structured_fact_rejected_count = 0
+
+    structured_fact_conflict_count = 0
+
+    validated_facts = []
+
+    # -----------------------------------------------------
+    # Structured web extraction is permitted only when:
+    #
+    # 1. Web evidence was successfully persisted.
+    # 2. The caller explicitly requested structured facts.
+    # 3. Structured web fact extraction is enabled.
+    #
+    # This prevents raw search snippets or unpersisted
+    # fetched content from becoming analysis_facts.
+    # -----------------------------------------------------
+
+    if (
+        citation_ready
+        and tool_input.extract_structured_facts
+        and settings.web_fact_extraction_enabled
+    ):
+        structured_fact_attempted = True
+
+        try:
+            # ---------------------------------------------
+            # 3H-E-1
+            # Extract structured candidates from verified,
+            # persisted web evidence.
+            # ---------------------------------------------
+
+            extraction = (
+                extract_web_financial_facts(
+                    user_id=(
+                        user_id
+                    ),
+                    question=(
+                        tool_input.query
+                    ),
+                    citation_sources=(
+                        citation_sources
+                    ),
+                )
+            )
+
+            structured_fact_candidate_count = (
+                extraction
+                .candidate_count
+            )
+
+            structured_fact_persisted_count = (
+                extraction
+                .persisted_count
+            )
+
+            warnings.extend(
+                extraction.warnings
+            )
+
+            # ---------------------------------------------
+            # 3H-E-2
+            # Deterministically validate only facts that
+            # were actually persisted.
+            # ---------------------------------------------
+
+            if extraction.fact_ids:
+                validation = (
+                    validate_web_facts(
+                        user_id=(
+                            user_id
+                        ),
+                        fact_ids=(
+                            extraction
+                            .fact_ids
+                        ),
+                    )
+                )
+
+                structured_fact_validated_count = (
+                    validation
+                    .validated_count
+                )
+
+                structured_fact_rejected_count = (
+                    validation
+                    .rejected_count
+                )
+
+                structured_fact_conflict_count = (
+                    validation
+                    .conflict_count
+                )
+
+                warnings.extend(
+                    validation.warnings
+                )
+
+                # -----------------------------------------
+                # 3H-E-3
+                # Return only facts whose persisted status
+                # is validated.
+                #
+                # rejected/conflict/pending facts are not
+                # exposed as usable quantitative evidence.
+                # -----------------------------------------
+
+                validated_facts = (
+                    load_validated_web_facts(
+                        user_id=(
+                            user_id
+                        ),
+                        fact_ids=(
+                            extraction
+                            .fact_ids
+                        ),
+                        citation_sources=(
+                            citation_sources
+                        ),
+                    )
+                )
+
+            elif (
+                extraction.attempted
+                and extraction.candidate_count
+                == 0
+            ):
+                warnings.append(
+                    (
+                        "Structured web fact "
+                        "extraction completed but "
+                        "returned no financial "
+                        "fact candidates."
+                    )
+                )
+
+        except Exception as error:
+            # ---------------------------------------------
+            # Structured-fact failure must not destroy the
+            # successfully fetched/cited web evidence.
+            #
+            # Narrative web evidence remains usable through
+            # citation_sources, while structured_fact_ready
+            # stays false.
+            # ---------------------------------------------
+
+            warnings.append(
+                (
+                    "Structured web fact "
+                    "processing failed: "
+                    f"{type(error).__name__}: "
+                    f"{error}"
+                )
+            )
+
+    structured_fact_ready = bool(
+        validated_facts
+    )
+
+    # =====================================================
+    # Final WebResearchOutput
+    # =====================================================
+
     return (
         search_output
         .model_copy(
             update={
+                # -----------------------------------------
+                # Phase 3H-C
+                # -----------------------------------------
+
                 "fetched_source_count":
                     len(
                         fetched_sources
@@ -186,6 +401,10 @@ def web_research_tool(
                 "fetch_failures":
                     fetch_failures,
 
+                # -----------------------------------------
+                # Phase 3H-D
+                # -----------------------------------------
+
                 "citation_ready":
                     citation_ready,
 
@@ -196,6 +415,38 @@ def web_research_tool(
 
                 "citation_sources":
                     citation_sources,
+
+                # -----------------------------------------
+                # Phase 3H-E
+                # -----------------------------------------
+
+                "structured_fact_attempted":
+                    structured_fact_attempted,
+
+                "structured_fact_ready":
+                    structured_fact_ready,
+
+                "structured_fact_candidate_count":
+                    structured_fact_candidate_count,
+
+                "structured_fact_persisted_count":
+                    structured_fact_persisted_count,
+
+                "structured_fact_validated_count":
+                    structured_fact_validated_count,
+
+                "structured_fact_rejected_count":
+                    structured_fact_rejected_count,
+
+                "structured_fact_conflict_count":
+                    structured_fact_conflict_count,
+
+                "validated_facts":
+                    validated_facts,
+
+                # -----------------------------------------
+                # Combined warnings
+                # -----------------------------------------
 
                 "warnings":
                     warnings,
