@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from uuid import uuid4
 
 from fastapi import (
@@ -15,11 +17,23 @@ from app.schemas.agent import (
     AgentAnalyzeResponse,
 )
 
+from app.services.web_product_response import (
+    build_web_product_summary,
+    sanitize_tool_results_for_public,
+)
+
 
 router = APIRouter(
     prefix="/agents",
-    tags=["agents"],
+    tags=[
+        "agents",
+    ],
 )
+
+
+# =========================================================
+# User identity
+# =========================================================
 
 
 def get_user_id(
@@ -33,9 +47,16 @@ def get_user_id(
     )
 
 
+# =========================================================
+# Agent analysis
+# =========================================================
+
+
 @router.post(
     "/analyze",
-    response_model=AgentAnalyzeResponse,
+    response_model=(
+        AgentAnalyzeResponse
+    ),
 )
 def analyze(
     request: AgentAnalyzeRequest,
@@ -51,10 +72,10 @@ def analyze(
         request.dataset_id
     )
 
-    # ---------------------------------------------------------
+    # -----------------------------------------------------
     # Phase 3F
-    # Ensure dataset_id and chart_request.dataset_id agree.
-    # ---------------------------------------------------------
+    # Keep dataset_id and chart_request.dataset_id aligned.
+    # -----------------------------------------------------
 
     if request.chart_request:
         chart_dataset_id = (
@@ -83,18 +104,20 @@ def analyze(
         )
 
     try:
-        user_id = get_user_id(
-            request.user_id,
-            x_user_id,
+        user_id = (
+            get_user_id(
+                request.user_id,
+                x_user_id,
+            )
         )
 
         graph = (
             build_finance_memory_graph()
         )
 
-        # -----------------------------------------------------
-        # Initial LangGraph state
-        # -----------------------------------------------------
+        # =================================================
+        # LangGraph request state
+        # =================================================
 
         result = graph.invoke(
             {
@@ -110,75 +133,60 @@ def analyze(
                     .strip(),
 
                 "provider_id":
-                    request.provider_id,
+                    request
+                    .provider_id,
 
-                # ---------------------------------------------
-                # Phase 3D / 3G
-                # Document-aware analysis
-                # ---------------------------------------------
+                # -----------------------------------------
+                # Phase 3D
+                # Uploaded-document RAG
+                # -----------------------------------------
 
                 "use_documents":
-                    request.use_documents,
+                    request
+                    .use_documents,
 
                 "document_ids":
-                    request.document_ids,
+                    request
+                    .document_ids,
 
                 "top_k":
-                    request.top_k,
+                    request
+                    .top_k,
 
-                # ---------------------------------------------
-                # Phase 3E
-                # Structured dataset analysis
-                # ---------------------------------------------
+                # -----------------------------------------
+                # Phase 3E / 3F
+                # Structured data and charting
+                # -----------------------------------------
 
                 "dataset_id":
                     effective_dataset_id,
 
-                # ---------------------------------------------
-                # Phase 3F
-                # Chart planning
-                # ---------------------------------------------
-
                 "chart_request":
-                    request.chart_request,
+                    request
+                    .chart_request,
 
-                # ---------------------------------------------
-                # Phase 3H-A
-                # Web fallback control
-                #
-                # IMPORTANT:
-                # 3H-A does not execute web research.
-                # These fields only carry user permission
-                # and expose deterministic gap detection.
-                # ---------------------------------------------
+                # -----------------------------------------
+                # Phase 3H-A+
+                # Explicit web fallback controls
+                # -----------------------------------------
 
                 "allow_web_fallback":
-                    request.allow_web_fallback,
+                    request
+                    .allow_web_fallback,
 
                 "trusted_web_domains":
-                    request.trusted_web_domains,
+                    request
+                    .trusted_web_domains,
 
-                "web_fallback_used":
-                    False,
-
-                "web_fallback_available":
-                    False,
-
-                "web_fallback_reason":
-                    None,
-
-                # ---------------------------------------------
-                # Existing request metadata
-                # ---------------------------------------------
+                # -----------------------------------------
+                # General request metadata
+                # -----------------------------------------
 
                 "metadata":
-                    request.metadata,
+                    request
+                    .metadata,
             }
         )
-
-        # -----------------------------------------------------
-        # Extract graph results
-        # -----------------------------------------------------
 
         tool_plan = (
             result.get(
@@ -191,93 +199,149 @@ def analyze(
                 "tool_results",
                 [],
             )
+            or []
         )
 
-        # -----------------------------------------------------
-        # API response
-        # -----------------------------------------------------
+        # =================================================
+        # Phase 3H-F-A
+        # Public product response
+        # =================================================
 
-        return AgentAnalyzeResponse(
-            ok=True,
+        web_fallback_used = bool(
+            result.get(
+                "web_fallback_used",
+                False,
+            )
+        )
 
-            request_id=(
-                request_id
-            ),
+        web_fallback_available = bool(
+            result.get(
+                "web_fallback_available",
+                False,
+            )
+        )
 
-            answer=(
-                result.get(
-                    "answer",
-                    "",
-                )
-            ),
+        web_fallback_reason = (
+            result.get(
+                "web_fallback_reason"
+            )
+        )
 
-            memory_context=(
-                result.get(
-                    "memory_context",
-                    "",
-                )
-            ),
+        web_research = (
+            build_web_product_summary(
+                tool_results=(
+                    tool_results
+                ),
 
-            memory_used_count=(
-                result.get(
-                    "memory_used_count",
-                    0,
-                )
-            ),
+                web_fallback_used=(
+                    web_fallback_used
+                ),
 
-            model=(
-                result.get(
-                    "model",
-                    "",
-                )
-            ),
+                web_fallback_available=(
+                    web_fallback_available
+                ),
 
-            tool_plan=(
-                tool_plan.model_dump(
-                    mode="json"
-                )
-                if tool_plan
-                else None
-            ),
+                web_fallback_reason=(
+                    web_fallback_reason
+                ),
+            )
+        )
 
-            tool_results=[
-                tool_result.model_dump(
-                    mode="json"
-                )
-                for tool_result
-                in tool_results
-            ],
+        # IMPORTANT:
+        #
+        # Raw web_research tool output must never be sent
+        # directly to the browser.
+        public_tool_results = (
+            sanitize_tool_results_for_public(
+                tool_results
+            )
+        )
 
-            grounding=(
-                result.get(
-                    "grounding"
-                )
-            ),
+        # =================================================
+        # Response
+        # =================================================
 
-            # ---------------------------------------------
-            # Phase 3H-A
-            # Web fallback state
-            # ---------------------------------------------
+        return (
+            AgentAnalyzeResponse(
+                ok=True,
 
-            web_fallback_used=bool(
-                result.get(
-                    "web_fallback_used",
-                    False,
-                )
-            ),
+                request_id=(
+                    request_id
+                ),
 
-            web_fallback_available=bool(
-                result.get(
-                    "web_fallback_available",
-                    False,
-                )
-            ),
+                answer=(
+                    result.get(
+                        "answer",
+                        "",
+                    )
+                ),
 
-            web_fallback_reason=(
-                result.get(
-                    "web_fallback_reason"
-                )
-            ),
+                memory_context=(
+                    result.get(
+                        "memory_context",
+                        "",
+                    )
+                ),
+
+                memory_used_count=(
+                    result.get(
+                        "memory_used_count",
+                        0,
+                    )
+                ),
+
+                model=(
+                    result.get(
+                        "model",
+                        "",
+                    )
+                ),
+
+                tool_plan=(
+                    tool_plan
+                    .model_dump(
+                        mode="json"
+                    )
+                    if tool_plan
+                    else None
+                ),
+
+                # 3H-F-A:
+                # browser-safe version only.
+                tool_results=(
+                    public_tool_results
+                ),
+
+                grounding=(
+                    result.get(
+                        "grounding"
+                    )
+                ),
+
+                # -----------------------------------------
+                # Phase 3H-A control state
+                # -----------------------------------------
+
+                web_fallback_used=(
+                    web_fallback_used
+                ),
+
+                web_fallback_available=(
+                    web_fallback_available
+                ),
+
+                web_fallback_reason=(
+                    web_fallback_reason
+                ),
+
+                # -----------------------------------------
+                # Phase 3H-F-A public web evidence
+                # -----------------------------------------
+
+                web_research=(
+                    web_research
+                ),
+            )
         )
 
     except HTTPException:
@@ -286,8 +350,7 @@ def analyze(
     except Exception as error:
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"{type(error).__name__}: "
-                f"{error}"
+            detail=str(
+                error
             ),
         ) from error

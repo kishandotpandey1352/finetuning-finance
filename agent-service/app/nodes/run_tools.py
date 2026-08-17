@@ -24,6 +24,323 @@ from app.tools.registry import (
     run_web_research,
 )
 
+import re
+import time
+from typing import Any
+
+from app.graphs.state import FinanceAgentState
+
+from app.schemas.tools import (
+    ToolCallRecord,
+    ToolCallStatus,
+    ToolName,
+)
+
+from app.services.web_gap_detector import (
+    detect_web_gap,
+)
+
+from app.schemas.web import (
+    WebResearchInput,
+)
+
+from app.tools.registry import (
+    run_chart_planner,
+    run_csv_profile,
+    run_document_search,
+    run_financial_calculator,
+    run_financial_fact_extractor,
+    run_memory_lookup,
+    run_web_research,
+)
+
+# =========================================================
+# Financial-fact extraction preflight
+# =========================================================
+
+
+YEAR_PATTERN = re.compile(
+    r"\b(?:19|20)\d{2}\b"
+)
+
+
+FACT_PREFLIGHT_STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "by",
+    "did",
+    "do",
+    "does",
+    "for",
+    "from",
+    "how",
+    "in",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "was",
+    "were",
+    "what",
+    "which",
+    "with",
+    "year",
+    "years",
+    "quarter",
+    "quarterly",
+}
+
+
+def _as_output_dict(
+    value: Any,
+) -> dict[str, Any]:
+    if isinstance(
+        value,
+        dict,
+    ):
+        return value
+
+    if hasattr(
+        value,
+        "model_dump",
+    ):
+        dumped = value.model_dump(
+            mode="json"
+        )
+
+        if isinstance(
+            dumped,
+            dict,
+        ):
+            return dumped
+
+    return {}
+
+
+def _fact_tokens(
+    value: str,
+) -> set[str]:
+    normalized = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        value.lower(),
+    )
+
+    return {
+        token
+        for token
+        in normalized.split()
+        if (
+            token
+            and token
+            not in FACT_PREFLIGHT_STOP_WORDS
+            and (
+                len(token) >= 3
+                or token.isdigit()
+            )
+        )
+    }
+
+
+def _document_search_supports_fact_request(
+    *,
+    question: str,
+    requested_metrics: list[str],
+    document_search_output: Any,
+) -> tuple[
+    bool,
+    str | None,
+]:
+    """
+    Avoid launching expensive structured extraction when
+    the document search that already ran does not contain
+    evidence for the requested metric/period.
+
+    This is intentionally conservative.
+
+    If we cannot inspect the document-search output, allow
+    the extractor rather than incorrectly blocking it.
+    """
+
+    output = (
+        _as_output_dict(
+            document_search_output
+        )
+    )
+
+    if not output:
+        return (
+            True,
+            None,
+        )
+
+    sources = (
+        output.get(
+            "sources"
+        )
+        or []
+    )
+
+    if not isinstance(
+        sources,
+        list,
+    ):
+        return (
+            True,
+            None,
+        )
+
+    if not sources:
+        return (
+            False,
+            (
+                "Skipped structured financial fact "
+                "extraction because document search "
+                "returned no source evidence."
+            ),
+        )
+
+    requested_years = set(
+        YEAR_PATTERN.findall(
+            question
+        )
+    )
+
+    metric_token_sets: list[
+        set[str]
+    ] = []
+
+    for metric in (
+        requested_metrics
+        or []
+    ):
+        tokens = (
+            _fact_tokens(
+                metric
+            )
+        )
+
+        # Year is a period constraint, not a metric token.
+        tokens = {
+            token
+            for token in tokens
+            if not YEAR_PATTERN.fullmatch(
+                token
+            )
+        }
+
+        if tokens:
+            metric_token_sets.append(
+                tokens
+            )
+
+    # If the planner did not supply requested_metrics,
+    # do not make a speculative metric decision here.
+    if (
+        not metric_token_sets
+        and not requested_years
+    ):
+        return (
+            True,
+            None,
+        )
+
+    for source in sources:
+        if not isinstance(
+            source,
+            dict,
+        ):
+            continue
+
+        snippet = str(
+            source.get(
+                "snippet"
+            )
+            or source.get(
+                "source_snippet"
+            )
+            or ""
+        )
+
+        if not snippet:
+            continue
+
+        snippet_tokens = (
+            _fact_tokens(
+                snippet
+            )
+        )
+
+        metric_supported = True
+
+        if metric_token_sets:
+            metric_supported = any(
+                metric_tokens.issubset(
+                    snippet_tokens
+                )
+                for metric_tokens
+                in metric_token_sets
+            )
+
+        period_supported = True
+
+        if requested_years:
+            snippet_years = set(
+                YEAR_PATTERN.findall(
+                    snippet
+                )
+            )
+
+            period_supported = bool(
+                requested_years
+                .intersection(
+                    snippet_years
+                )
+            )
+
+        if (
+            metric_supported
+            and period_supported
+        ):
+            return (
+                True,
+                None,
+            )
+
+    requested_period = (
+        ", ".join(
+            sorted(
+                requested_years
+            )
+        )
+        if requested_years
+        else "requested period"
+    )
+
+    requested_metric = (
+        ", ".join(
+            requested_metrics
+        )
+        if requested_metrics
+        else "requested metric"
+    )
+
+    return (
+        False,
+        (
+            "Skipped expensive structured financial "
+            "fact extraction because retrieved document "
+            "evidence did not explicitly support both "
+            f"{requested_metric} and {requested_period}."
+        ),
+    )
 
 def run_tools_node(
     state: FinanceAgentState,
@@ -33,6 +350,8 @@ def run_tools_node(
     tool_results: list[
         ToolCallRecord
     ] = []
+
+    document_search_output = None
 
     # ---------------------------------------------------------
     # 1. Memory lookup
@@ -149,8 +468,8 @@ def run_tools_node(
                 )
             )
 
-    # ---------------------------------------------------------
-    # 3. Financial fact extractor - Phase 3G-D
+        # ---------------------------------------------------------
+    # 3. Financial fact extractor - Phase 3G-D / 3H hardening
     # ---------------------------------------------------------
 
     if (
@@ -165,12 +484,41 @@ def run_tools_node(
             .financial_fact_extractor_input
         )
 
-        try:
-            fact_output = (
-                run_financial_fact_extractor(
-                    state["user_id"],
-                    fact_input,
-                )
+        (
+            should_run_fact_extractor,
+            fact_preflight_reason,
+        ) = (
+            _document_search_supports_fact_request(
+                question=(
+                    state["question"]
+                ),
+                requested_metrics=(
+                    fact_input
+                    .requested_metrics
+                ),
+                document_search_output=(
+                    document_search_output
+                ),
+            )
+        )
+
+        # -----------------------------------------------------
+        # If normal document RAG could not retrieve the
+        # requested metric + explicit period, do not launch a
+        # second expensive LLM extraction over the document.
+        #
+        # Empty facts intentionally allow detect_web_gap()
+        # below to conclude that local evidence is missing.
+        # -----------------------------------------------------
+
+        if not should_run_fact_extractor:
+            print(
+                (
+                    "[run_tools] SKIP "
+                    "financial_fact_extractor: "
+                    f"{fact_preflight_reason}"
+                ),
+                flush=True,
             )
 
             tool_results.append(
@@ -189,36 +537,125 @@ def run_tools_node(
                             mode="json"
                         )
                     ),
-                    output=(
-                        fact_output
-                    ),
+                    output={
+                        "ok":
+                            True,
+
+                        "query":
+                            fact_input.query,
+
+                        "document_summaries":
+                            [],
+
+                        "facts":
+                            [],
+
+                        "sources":
+                            [],
+
+                        "warnings": [
+                            fact_preflight_reason
+                        ],
+                    },
                 )
             )
 
-        except Exception as error:
-            tool_results.append(
-                ToolCallRecord(
-                    tool_name=(
-                        ToolName
-                        .financial_fact_extractor
+        else:
+            fact_started_at = (
+                time.perf_counter()
+            )
+
+            print(
+                (
+                    "[run_tools] START "
+                    "financial_fact_extractor"
+                ),
+                flush=True,
+            )
+
+            try:
+                fact_output = (
+                    run_financial_fact_extractor(
+                        state["user_id"],
+                        fact_input,
+                    )
+                )
+
+                elapsed = (
+                    time.perf_counter()
+                    - fact_started_at
+                )
+
+                print(
+                    (
+                        "[run_tools] END "
+                        "financial_fact_extractor "
+                        f"{elapsed:.2f}s"
                     ),
-                    status=(
-                        ToolCallStatus
-                        .failed
-                    ),
-                    input=(
-                        fact_input
-                        .model_dump(
-                            mode="json"
-                        )
-                    ),
-                    error=(
+                    flush=True,
+                )
+
+                tool_results.append(
+                    ToolCallRecord(
+                        tool_name=(
+                            ToolName
+                            .financial_fact_extractor
+                        ),
+                        status=(
+                            ToolCallStatus
+                            .completed
+                        ),
+                        input=(
+                            fact_input
+                            .model_dump(
+                                mode="json"
+                            )
+                        ),
+                        output=(
+                            fact_output
+                        ),
+                    )
+                )
+
+            except Exception as error:
+                elapsed = (
+                    time.perf_counter()
+                    - fact_started_at
+                )
+
+                print(
+                    (
+                        "[run_tools] FAIL "
+                        "financial_fact_extractor "
+                        f"{elapsed:.2f}s: "
                         f"{type(error).__name__}: "
                         f"{error}"
                     ),
+                    flush=True,
                 )
-            )
 
+                tool_results.append(
+                    ToolCallRecord(
+                        tool_name=(
+                            ToolName
+                            .financial_fact_extractor
+                        ),
+                        status=(
+                            ToolCallStatus
+                            .failed
+                        ),
+                        input=(
+                            fact_input
+                            .model_dump(
+                                mode="json"
+                            )
+                        ),
+                        error=(
+                            f"{type(error).__name__}: "
+                            f"{error}"
+                        ),
+                    )
+                )
     # ---------------------------------------------------------
     # 4. CSV profile - Phase 3E
     # ---------------------------------------------------------

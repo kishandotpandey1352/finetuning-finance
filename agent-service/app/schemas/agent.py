@@ -2,6 +2,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 from app.schemas.chart import ChartRequest
+from app.schemas.web import (
+    WebProductResearchSummary,
+)
 
 class AgentAnalyzeRequest(BaseModel):
     question: str = Field(min_length=1)
@@ -47,3 +50,13 @@ class AgentAnalyzeResponse(BaseModel):
     web_fallback_reason: str | None = None
 
     grounding: dict[str, Any] | None = None
+
+    # -----------------------------------------------------
+    # Phase 3H-F-A
+    # Browser-safe web product response
+    # -----------------------------------------------------
+
+    web_research: (
+        WebProductResearchSummary
+        | None
+    ) = None

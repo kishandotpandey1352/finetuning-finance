@@ -403,3 +403,148 @@ class WebResearchOutput(BaseModel):
     structured_fact_conflict_count: int = 0
 
     validated_facts: list[WebValidatedFinancialFact] = Field(default_factory=list,)
+
+
+# =========================================================
+# Phase 3H-F-A
+# Product-safe web research response
+# =========================================================
+
+
+class WebPublicCitation(
+    BaseModel
+):
+    """
+    Browser-safe representation of one persisted,
+    citation-ready web evidence passage.
+
+    Does not expose:
+    - Serper ranking internals
+    - raw fetch responses
+    - fetch failures
+    - provider payloads
+    """
+
+    source_number: int = Field(
+        ge=2001,
+    )
+
+    source_id: str
+
+    title: str
+
+    url: str
+
+    domain: str
+
+    snippet: str
+
+    page_number: int | None = None
+
+    trust_tier: WebTrustTier
+
+    content_type: WebContentKind
+
+    retrieved_at: str
+
+
+class WebPublicFinancialFact(
+    BaseModel
+):
+    """
+    Browser-safe representation of a deterministically
+    validated structured web financial fact.
+    """
+
+    fact_id: str
+
+    source_number: int = Field(
+        ge=2001,
+    )
+
+    source_ledger_id: str
+
+    company: str | None = None
+
+    metric_key: str
+
+    canonical_metric_key: str
+
+    metric_label: str
+
+    value_type: FactValueType
+
+    raw_value: str
+
+    numeric_value: Decimal | None = None
+
+    normalized_numeric_value: (
+        Decimal | None
+    ) = None
+
+    currency: str | None = None
+
+    scale: str | None = None
+
+    unit_label: str | None = None
+
+    period_label: str | None = None
+
+    validation_score: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class WebProductResearchSummary(
+    BaseModel
+):
+    """
+    Narrow public contract returned by /agents/analyze.
+
+    This is intentionally different from WebResearchOutput.
+
+    WebResearchOutput is an INTERNAL tool result.
+
+    WebProductResearchSummary is safe for the browser.
+    """
+
+    used: bool = False
+
+    available: bool = False
+
+    reason: str | None = None
+
+    searched: bool = False
+
+    evidence_ready: bool = False
+
+    citation_ready: bool = False
+
+    structured_fact_ready: bool = False
+
+    citation_count: int = Field(
+        default=0,
+        ge=0,
+    )
+
+    validated_fact_count: int = Field(
+        default=0,
+        ge=0,
+    )
+
+    citations: list[
+        WebPublicCitation
+    ] = Field(
+        default_factory=list,
+    )
+
+    validated_facts: list[
+        WebPublicFinancialFact
+    ] = Field(
+        default_factory=list,
+    )
+
+    warnings: list[str] = Field(
+        default_factory=list,
+    )

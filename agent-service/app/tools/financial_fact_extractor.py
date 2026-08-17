@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 
 from decimal import Decimal
 from typing import Any
@@ -58,36 +59,6 @@ STOP_WORDS = {
     "a",
     "an",
     "and",
-    "are",
-    "as",
-    "at",
-    "be",
-    "by",
-    "did",
-    "do",
-    "does",
-    "for",
-    "from",
-    "give",
-    "how",
-    "i",
-    "in",
-    "is",
-    "it",
-    "me",
-    "of",
-    "on",
-    "or",
-    "show",
-    "the",
-    "their",
-    "this",
-    "to",
-    "was",
-    "were",
-    "what",
-    "which",
-    "with",
     "annual",
     "are",
     "as",
@@ -128,8 +99,12 @@ STOP_WORDS = {
     "with",
     "year",
     "years",
-    
 }
+
+
+YEAR_PATTERN = re.compile(
+    r"\b(?:19|20)\d{2}\b"
+)
 
 
 # ============================================================
@@ -222,6 +197,148 @@ def _significant_tokens(
             )
         )
     }
+
+
+def _requested_years(
+    value: str,
+) -> set[str]:
+    return set(
+        YEAR_PATTERN.findall(
+            value
+        )
+    )
+
+
+def _metric_query_tokens(
+    *,
+    query: str,
+    requested_metrics: list[str],
+) -> set[str]:
+    """
+    Build tokens used specifically for metric matching.
+
+    When requested_metrics is available, prefer it over the
+    entire user question so company names and requested years
+    do not dilute metric-match coverage.
+
+    Example:
+
+        query:
+            Ambac commission income 2025
+
+        requested_metrics:
+            ["commission income"]
+
+        metric tokens:
+            {"commission", "income"}
+
+    rather than:
+
+        {"ambac", "commission", "income", "2025"}
+    """
+
+    if requested_metrics:
+        metric_text = " ".join(
+            requested_metrics
+        )
+
+        tokens = (
+            _significant_tokens(
+                metric_text
+            )
+        )
+
+        tokens = {
+            token
+            for token in tokens
+            if not YEAR_PATTERN.fullmatch(
+                token
+            )
+        }
+
+        if tokens:
+            return tokens
+
+    tokens = (
+        _significant_tokens(
+            query
+        )
+    )
+
+    return {
+        token
+        for token in tokens
+        if not YEAR_PATTERN.fullmatch(
+            token
+        )
+    }
+
+
+def _fact_period_matches_query(
+    *,
+    row: dict[str, Any],
+    query: str,
+) -> bool:
+    """
+    Prevent an exact metric from the wrong period from being
+    reused for a question containing an explicit year.
+
+    Example:
+
+        requested:
+            commission income 2025
+
+        existing fact:
+            commission income 2024
+
+        result:
+            False
+    """
+
+    requested_years = (
+        _requested_years(
+            query
+        )
+    )
+
+    if not requested_years:
+        return True
+
+    fact_period_text = " ".join(
+        [
+            _clean_text(
+                row.get(
+                    "period_label"
+                )
+            ),
+            _clean_text(
+                row.get(
+                    "period_start"
+                )
+            ),
+            _clean_text(
+                row.get(
+                    "period_end"
+                )
+            ),
+        ]
+    )
+
+    fact_years = (
+        _requested_years(
+            fact_period_text
+        )
+    )
+
+    if not fact_years:
+        return False
+
+    return bool(
+        requested_years
+        .intersection(
+            fact_years
+        )
+    )
 
 
 def _as_decimal(
@@ -358,26 +475,47 @@ def _load_status_counts(
 
     return counts
 
+
+# ============================================================
+# Existing-fact relevance
+# ============================================================
+
+
 def _fact_matches_query(
     *,
     row: dict[str, Any],
     query: str,
     requested_metrics: list[str],
 ) -> bool:
-    query_text = " ".join(
-        [
-            query,
-            *requested_metrics,
-        ]
-    )
+    """
+    Determine whether a previously validated fact can satisfy
+    the current request.
 
-    query_tokens = (
-        _significant_tokens(
-            query_text
+    Metric matching and period matching are intentionally
+    handled separately.
+
+    This fixes the previous problem where:
+
+        Ambac + commission + income + 2025
+
+    was compared against:
+
+        commission + income
+
+    causing a correct cached fact to miss the lexical
+    threshold.
+    """
+
+    metric_query_tokens = (
+        _metric_query_tokens(
+            query=query,
+            requested_metrics=(
+                requested_metrics
+            ),
         )
     )
 
-    if not query_tokens:
+    if not metric_query_tokens:
         return False
 
     fact_text = " ".join(
@@ -407,7 +545,7 @@ def _fact_matches_query(
     )
 
     overlap = (
-        query_tokens
+        metric_query_tokens
         .intersection(
             fact_tokens
         )
@@ -416,15 +554,36 @@ def _fact_matches_query(
     if not overlap:
         return False
 
-    if len(query_tokens) == 1:
+    # Explicit requested years must also match the fact
+    # period.
+    if not (
+        _fact_period_matches_query(
+            row=row,
+            query=query,
+        )
+    ):
+        return False
+
+    if (
+        len(
+            metric_query_tokens
+        )
+        == 1
+    ):
         return True
 
     coverage = (
-        len(overlap)
-        / len(query_tokens)
+        len(
+            overlap
+        )
+        / len(
+            metric_query_tokens
+        )
     )
 
-    return coverage >= 0.66
+    return (
+        coverage >= 0.66
+    )
 
 
 def _fact_relevance_score(
@@ -433,23 +592,19 @@ def _fact_relevance_score(
     query: str,
     requested_metrics: list[str],
 ) -> float:
-    query_text = " ".join(
-        [
-            query,
-            *requested_metrics,
-        ]
-    )
-
-    query_tokens = (
-        _significant_tokens(
-            query_text
+    metric_query_tokens = (
+        _metric_query_tokens(
+            query=query,
+            requested_metrics=(
+                requested_metrics
+            ),
         )
     )
 
-    if not query_tokens:
+    if not metric_query_tokens:
         return 0.0
 
-    fact_text = " ".join(
+    fact_metric_text = " ".join(
         [
             _clean_text(
                 row.get(
@@ -466,37 +621,17 @@ def _fact_relevance_score(
                     "metric_label"
                 )
             ),
-            _clean_text(
-                row.get(
-                    "company"
-                )
-            ),
-            _clean_text(
-                row.get(
-                    "category"
-                )
-            ),
-            _clean_text(
-                row.get(
-                    "statement_type"
-                )
-            ),
-            _clean_text(
-                row.get(
-                    "period_label"
-                )
-            ),
         ]
     )
 
     fact_tokens = (
         _significant_tokens(
-            fact_text
+            fact_metric_text
         )
     )
 
     overlap = (
-        query_tokens
+        metric_query_tokens
         .intersection(
             fact_tokens
         )
@@ -505,25 +640,33 @@ def _fact_relevance_score(
     if not overlap:
         return 0.0
 
+    if not (
+        _fact_period_matches_query(
+            row=row,
+            query=query,
+        )
+    ):
+        return 0.0
+
     coverage = (
-        len(overlap)
+        len(
+            overlap
+        )
         / max(
             1,
-            len(query_tokens),
+            len(
+                metric_query_tokens
+            ),
         )
     )
 
     score = (
         float(
-            len(overlap)
+            len(
+                overlap
+            )
         )
         + coverage
-    )
-
-    normalized_query = (
-        _normalize_search_text(
-            query_text
-        )
     )
 
     normalized_label = (
@@ -534,10 +677,23 @@ def _fact_relevance_score(
         )
     )
 
+    normalized_requested_metrics = (
+        _normalize_search_text(
+            " ".join(
+                requested_metrics
+            )
+        )
+    )
+
     if (
         normalized_label
-        and normalized_label
-        in normalized_query
+        and normalized_requested_metrics
+        and (
+            normalized_label
+            in normalized_requested_metrics
+            or normalized_requested_metrics
+            in normalized_label
+        )
     ):
         score += 3.0
 
@@ -551,8 +707,9 @@ def _fact_relevance_score(
 
     if (
         canonical_key
+        and normalized_requested_metrics
         and canonical_key
-        in normalized_query
+        in normalized_requested_metrics
     ):
         score += 2.0
 
@@ -595,12 +752,14 @@ def _rank_relevant_rows(
     ] = []
 
     for row in rows:
-        if not _fact_matches_query(
-            row=row,
-            query=query,
-            requested_metrics=(
-                requested_metrics
-            ),
+        if not (
+            _fact_matches_query(
+                row=row,
+                query=query,
+                requested_metrics=(
+                    requested_metrics
+                ),
+            )
         ):
             continue
 
@@ -641,6 +800,7 @@ def _rank_relevant_rows(
             row,
         ) in ranked
     ]
+
 
 # ============================================================
 # Source ledger loading
@@ -714,6 +874,35 @@ def _extract_and_validate_document(
         dict[str, Any]
     ],
 ]:
+    """
+    Run structured financial-fact extraction for one
+    document and validate newly persisted candidates.
+
+    This path is intentionally bounded for interactive
+    /agents/analyze latency.
+
+    The broader document search performed before this tool
+    should already have determined that structured extraction
+    is worthwhile.
+    """
+
+    # --------------------------------------------------------
+    # Extraction
+    # --------------------------------------------------------
+
+    extraction_started = (
+        time.perf_counter()
+    )
+
+    print(
+        (
+            "[financial_fact_extractor] "
+            f"START extraction "
+            f"{document_id}"
+        ),
+        flush=True,
+    )
+
     extraction = (
         extract_financial_facts(
             user_id=user_id,
@@ -722,70 +911,220 @@ def _extract_and_validate_document(
                     document_id=(
                         document_id
                     ),
+
                     company_hint=None,
+
                     requested_metrics=(
                         tool_input
                         .requested_metrics
                     ),
+
                     focus_queries=[
                         tool_input.query
                     ],
-                    top_k_per_query=8,
-                    max_sources=24,
-                    max_facts=(
-                        tool_input
-                        .max_facts_per_document
+
+                    # ------------------------------------
+                    # Interactive latency budget
+                    #
+                    # Previous values:
+                    #   top_k_per_query = 8
+                    #   max_sources     = 24
+                    #
+                    # Those values can make an interactive
+                    # request unnecessarily expensive.
+                    # ------------------------------------
+
+                    top_k_per_query=4,
+
+                    max_sources=8,
+
+                    max_facts=max(
+                        1,
+                        min(
+                            tool_input
+                            .max_facts_per_document,
+                            12,
+                        ),
                     ),
+
                     include_text_facts=False,
+
                     persist=True,
                 )
             ),
         )
     )
 
-    validation = (
-        validate_document_facts(
-            user_id=user_id,
-            document_id=document_id,
-            revalidate=False,
-        )
+    extraction_elapsed = (
+        time.perf_counter()
+        - extraction_started
     )
+
+    print(
+        (
+            "[financial_fact_extractor] "
+            f"END extraction "
+            f"{document_id} "
+            f"{extraction_elapsed:.2f}s "
+            f"candidates="
+            f"{extraction.candidate_count} "
+            f"persisted="
+            f"{extraction.persisted_count}"
+        ),
+        flush=True,
+    )
+
+    # --------------------------------------------------------
+    # Validation
+    # --------------------------------------------------------
+
+    validation_warnings: list[str] = []
+
+    processed_count = 0
+
+    validated_count = 0
+
+    rejected_count = 0
+
+    conflict_count = 0
+
+    # Do not run a document-wide validator when extraction
+    # produced nothing new.
+    if (
+        extraction.persisted_count
+        > 0
+    ):
+        validation_started = (
+            time.perf_counter()
+        )
+
+        print(
+            (
+                "[financial_fact_extractor] "
+                f"START validation "
+                f"{document_id}"
+            ),
+            flush=True,
+        )
+
+        validation = (
+            validate_document_facts(
+                user_id=user_id,
+                document_id=document_id,
+                revalidate=False,
+            )
+        )
+
+        validation_elapsed = (
+            time.perf_counter()
+            - validation_started
+        )
+
+        print(
+            (
+                "[financial_fact_extractor] "
+                f"END validation "
+                f"{document_id} "
+                f"{validation_elapsed:.2f}s "
+                f"processed="
+                f"{validation.processed_count} "
+                f"validated="
+                f"{validation.validated_count} "
+                f"rejected="
+                f"{validation.rejected_count} "
+                f"conflicts="
+                f"{validation.conflict_count}"
+            ),
+            flush=True,
+        )
+
+        processed_count = (
+            validation
+            .processed_count
+        )
+
+        validated_count = (
+            validation
+            .validated_count
+        )
+
+        rejected_count = (
+            validation
+            .rejected_count
+        )
+
+        conflict_count = (
+            validation
+            .conflict_count
+        )
+
+        validation_warnings.extend(
+            validation.warnings
+        )
+
+    else:
+        validation_warnings.append(
+            (
+                "No new financial fact "
+                "candidates were persisted; "
+                "document-wide validation was "
+                "not rerun."
+            )
+        )
+
+    # --------------------------------------------------------
+    # Tool summary
+    # --------------------------------------------------------
 
     summary = (
         FinancialFactToolDocumentSummary(
-            document_id=document_id,
+            document_id=(
+                document_id
+            ),
+
             ok=True,
+
             extraction_performed=True,
+
             extracted_count=(
                 extraction
                 .candidate_count
             ),
+
             persisted_count=(
                 extraction
                 .persisted_count
             ),
+
             processed_count=(
-                validation
-                .processed_count
+                processed_count
             ),
+
             validated_count=(
-                validation
-                .validated_count
+                validated_count
             ),
+
             rejected_count=(
-                validation
-                .rejected_count
+                rejected_count
             ),
+
             conflict_count=(
-                validation
-                .conflict_count
+                conflict_count
             ),
+
             warnings=[
                 *extraction.warnings,
-                *validation.warnings,
+                *validation_warnings,
             ],
         )
     )
+
+    # --------------------------------------------------------
+    # Reload all currently validated facts for this document.
+    #
+    # _build_output() applies the metric/period relevance
+    # filter afterward.
+    # --------------------------------------------------------
 
     client = (
         _get_supabase_client()
@@ -823,6 +1162,10 @@ def _build_output(
     ],
     warnings: list[str],
 ) -> FinancialFactExtractorOutput:
+    # --------------------------------------------------------
+    # Rank facts by metric + period relevance.
+    # --------------------------------------------------------
+
     ranked_rows = sorted(
         fact_rows,
         key=lambda row: (
@@ -875,20 +1218,14 @@ def _build_output(
         warnings.append(
             (
                 "No validated financial fact "
-                "matched the requested metric."
+                "matched the requested metric "
+                "and period."
             )
         )
 
-        if selected_rows:
-            warnings.append(
-                (
-                    "No validated fact had a "
-                    "strong lexical match to the "
-                    "question. Returning the "
-                    "highest-confidence validated "
-                    "facts for context."
-                )
-            )
+    # --------------------------------------------------------
+    # Load provenance only for facts actually being returned.
+    # --------------------------------------------------------
 
     source_ids = list(
         {
@@ -897,8 +1234,7 @@ def _build_output(
                     "source_ledger_id"
                 ]
             )
-            for row
-            in selected_rows
+            for row in selected_rows
             if row.get(
                 "source_ledger_id"
             )
@@ -915,9 +1251,8 @@ def _build_output(
         )
     )
 
-    # Start at 1001 so these citation numbers do not
-    # collide with normal document_search [Source 1],
-    # [Source 2], etc.
+    # Start at 1001 so structured document-fact citations do
+    # not collide with normal RAG [Source 1], [Source 2], etc.
     source_number_map: dict[
         str,
         int,
@@ -928,6 +1263,10 @@ def _build_output(
     ] = []
 
     next_source_number = 1001
+
+    # --------------------------------------------------------
+    # Build source objects
+    # --------------------------------------------------------
 
     for row in selected_rows:
         source_id = str(
@@ -964,15 +1303,18 @@ def _build_output(
                 source_number=(
                     next_source_number
                 ),
+
                 source_ledger_id=(
                     source_id
                 ),
+
                 document_id=str(
                     source.get(
                         "document_id",
                         "",
                     )
                 ),
+
                 chunk_id=(
                     str(
                         source.get(
@@ -984,6 +1326,7 @@ def _build_output(
                     )
                     else None
                 ),
+
                 source_title=(
                     _clean_text(
                         source.get(
@@ -992,11 +1335,13 @@ def _build_output(
                     )
                     or None
                 ),
+
                 page_number=(
                     source.get(
                         "page_number"
                     )
                 ),
+
                 source_snippet=(
                     _clean_text(
                         source.get(
@@ -1004,6 +1349,7 @@ def _build_output(
                         )
                     )
                 ),
+
                 retrieval_score=(
                     float(
                         source.get(
@@ -1023,6 +1369,10 @@ def _build_output(
 
         next_source_number += 1
 
+    # --------------------------------------------------------
+    # Build fact objects
+    # --------------------------------------------------------
+
     facts: list[
         FinancialFactToolFact
     ] = []
@@ -1041,8 +1391,8 @@ def _build_output(
             )
         )
 
-        # A validated fact without a usable provenance
-        # source is not safe to expose to the answer model.
+        # A validated fact without usable provenance must not
+        # be exposed to the answer model.
         if source_number is None:
             warnings.append(
                 (
@@ -1062,14 +1412,17 @@ def _build_output(
                         "id"
                     ]
                 ),
+
                 document_id=str(
                     row[
                         "document_id"
                     ]
                 ),
+
                 source_number=(
                     source_number
                 ),
+
                 company=(
                     _clean_text(
                         row.get(
@@ -1078,12 +1431,14 @@ def _build_output(
                     )
                     or None
                 ),
+
                 metric_key=str(
                     row.get(
                         "metric_key",
                         "",
                     )
                 ),
+
                 canonical_metric_key=(
                     _clean_text(
                         row.get(
@@ -1092,18 +1447,21 @@ def _build_output(
                     )
                     or None
                 ),
+
                 metric_label=str(
                     row.get(
                         "metric_label",
                         "",
                     )
                 ),
+
                 value_type=str(
                     row.get(
                         "value_type",
                         "",
                     )
                 ),
+
                 numeric_value=(
                     _as_decimal(
                         row.get(
@@ -1111,6 +1469,7 @@ def _build_output(
                         )
                     )
                 ),
+
                 normalized_numeric_value=(
                     _as_decimal(
                         row.get(
@@ -1118,6 +1477,7 @@ def _build_output(
                         )
                     )
                 ),
+
                 text_value=(
                     _clean_text(
                         row.get(
@@ -1126,12 +1486,14 @@ def _build_output(
                     )
                     or None
                 ),
+
                 raw_value=str(
                     row.get(
                         "raw_value",
                         "",
                     )
                 ),
+
                 unit_key=(
                     _clean_text(
                         row.get(
@@ -1140,6 +1502,7 @@ def _build_output(
                     )
                     or None
                 ),
+
                 unit_label=(
                     _clean_text(
                         row.get(
@@ -1148,6 +1511,7 @@ def _build_output(
                     )
                     or None
                 ),
+
                 currency=(
                     _clean_text(
                         row.get(
@@ -1156,6 +1520,7 @@ def _build_output(
                     )
                     or None
                 ),
+
                 scale=(
                     _clean_text(
                         row.get(
@@ -1164,6 +1529,7 @@ def _build_output(
                     )
                     or None
                 ),
+
                 period_label=(
                     _clean_text(
                         row.get(
@@ -1172,16 +1538,19 @@ def _build_output(
                     )
                     or None
                 ),
+
                 period_start=(
                     row.get(
                         "period_start"
                     )
                 ),
+
                 period_end=(
                     row.get(
                         "period_end"
                     )
                 ),
+
                 category=(
                     _clean_text(
                         row.get(
@@ -1190,6 +1559,7 @@ def _build_output(
                     )
                     or None
                 ),
+
                 statement_type=(
                     _clean_text(
                         row.get(
@@ -1198,6 +1568,7 @@ def _build_output(
                     )
                     or None
                 ),
+
                 validation_score=(
                     float(
                         row.get(
@@ -1222,15 +1593,26 @@ def _build_output(
                 for summary
                 in summaries
             ),
+
             query=(
                 tool_input.query
             ),
+
             document_summaries=(
                 summaries
             ),
-            facts=facts,
-            sources=sources,
-            warnings=warnings,
+
+            facts=(
+                facts
+            ),
+
+            sources=(
+                sources
+            ),
+
+            warnings=(
+                warnings
+            ),
         )
     )
 
@@ -1245,6 +1627,16 @@ def financial_fact_extractor_tool(
     user_id: str,
     tool_input: FinancialFactExtractorInput,
 ) -> FinancialFactExtractorOutput:
+    """
+    Return validated, source-backed financial facts.
+
+    The tool first attempts to reuse an existing validated fact
+    matching both the requested metric and explicit period.
+
+    Only if no suitable validated fact exists does it run the
+    more expensive structured extraction path.
+    """
+
     client = (
         _get_supabase_client()
     )
@@ -1262,7 +1654,25 @@ def financial_fact_extractor_tool(
     for document_id in (
         tool_input.document_ids
     ):
+        document_started = (
+            time.perf_counter()
+        )
+
+        print(
+            (
+                "[financial_fact_extractor] "
+                f"START document "
+                f"{document_id}"
+            ),
+            flush=True,
+        )
+
         try:
+            # ------------------------------------------------
+            # First attempt:
+            # reuse an existing validated metric + period fact.
+            # ------------------------------------------------
+
             existing_rows = (
                 _load_validated_fact_rows(
                     client=client,
@@ -1275,7 +1685,9 @@ def financial_fact_extractor_tool(
 
             relevant_existing = (
                 _rank_relevant_rows(
-                    rows=existing_rows,
+                    rows=(
+                        existing_rows
+                    ),
                     query=(
                         tool_input.query
                     ),
@@ -1286,8 +1698,6 @@ def financial_fact_extractor_tool(
                 )
             )
 
-            # Reuse source-backed validated facts instead
-            # of repeatedly paying for LLM extraction.
             if relevant_existing:
                 counts = (
                     _load_status_counts(
@@ -1304,26 +1714,35 @@ def financial_fact_extractor_tool(
                         document_id=(
                             document_id
                         ),
+
                         ok=True,
+
                         extraction_performed=False,
+
                         extracted_count=0,
+
                         persisted_count=0,
+
                         processed_count=0,
+
                         validated_count=(
                             counts[
                                 "validated"
                             ]
                         ),
+
                         rejected_count=(
                             counts[
                                 "rejected"
                             ]
                         ),
+
                         conflict_count=(
                             counts[
                                 "conflict"
                             ]
                         ),
+
                         warnings=[
                             (
                                 "Reused existing "
@@ -1337,7 +1756,29 @@ def financial_fact_extractor_tool(
                     relevant_existing
                 )
 
+                elapsed = (
+                    time.perf_counter()
+                    - document_started
+                )
+
+                print(
+                    (
+                        "[financial_fact_extractor] "
+                        f"REUSED document "
+                        f"{document_id} "
+                        f"{elapsed:.2f}s "
+                        f"facts="
+                        f"{len(relevant_existing)}"
+                    ),
+                    flush=True,
+                )
+
                 continue
+
+            # ------------------------------------------------
+            # Cache miss:
+            # perform bounded extraction + validation.
+            # ------------------------------------------------
 
             (
                 summary,
@@ -1362,7 +1803,27 @@ def financial_fact_extractor_tool(
                 extracted_rows
             )
 
+            elapsed = (
+                time.perf_counter()
+                - document_started
+            )
+
+            print(
+                (
+                    "[financial_fact_extractor] "
+                    f"END document "
+                    f"{document_id} "
+                    f"{elapsed:.2f}s"
+                ),
+                flush=True,
+            )
+
         except Exception as error:
+            elapsed = (
+                time.perf_counter()
+                - document_started
+            )
+
             error_message = (
                 f"Financial fact processing "
                 f"failed for {document_id}: "
@@ -1370,12 +1831,26 @@ def financial_fact_extractor_tool(
                 f"{error}"
             )
 
+            print(
+                (
+                    "[financial_fact_extractor] "
+                    f"FAIL document "
+                    f"{document_id} "
+                    f"{elapsed:.2f}s: "
+                    f"{type(error).__name__}: "
+                    f"{error}"
+                ),
+                flush=True,
+            )
+
             summaries.append(
                 FinancialFactToolDocumentSummary(
                     document_id=(
                         document_id
                     ),
+
                     ok=False,
+
                     error=(
                         error_message
                     ),
@@ -1386,11 +1861,21 @@ def financial_fact_extractor_tool(
                 error_message
             )
 
-    return _build_output(
-        client=client,
-        user_id=user_id,
-        tool_input=tool_input,
-        summaries=summaries,
-        fact_rows=all_rows,
-        warnings=warnings,
+    return (
+        _build_output(
+            client=client,
+            user_id=user_id,
+            tool_input=(
+                tool_input
+            ),
+            summaries=(
+                summaries
+            ),
+            fact_rows=(
+                all_rows
+            ),
+            warnings=(
+                warnings
+            ),
+        )
     )
