@@ -135,6 +135,18 @@ class Settings(
     web_fact_extraction_max_facts: int = 30
 
     web_fact_extraction_max_context_chars: int = 30000
+    
+    # =========================================================
+    # Phase 3H-F-B
+    # Web cost controls
+    # =========================================================
 
+    web_max_query_chars: int = 500
+
+    web_max_trusted_domains: int = 10
+
+    web_max_searches_per_user_hour: int = 20
+
+    web_max_results_per_search: int = 8
 
 settings = Settings()
