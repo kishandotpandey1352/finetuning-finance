@@ -149,4 +149,20 @@ class Settings(
 
     web_max_results_per_search: int = 8
 
+    # =========================================================
+    # Phase 3H-F-C
+    # Web caching
+    # =========================================================
+
+    web_cache_enabled: bool = True
+
+    # Search-engine discovery changes relatively quickly.
+    web_search_cache_ttl_seconds: int = 900
+
+    # Successfully fetched source content can live longer.
+    web_fetch_cache_ttl_seconds: int = 3600
+
+    # Maximum entries in each process-local cache.
+    web_cache_max_entries: int = 500
+
 settings = Settings()

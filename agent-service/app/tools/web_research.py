@@ -17,6 +17,15 @@ from app.services.serper_search import (
     search_web_with_serper,
 )
 
+from app.services.web_cache import (
+    build_web_fetch_cache_key,
+    build_web_search_cache_key,
+    get_cached_web_fetch,
+    get_cached_web_search,
+    set_cached_web_fetch,
+    set_cached_web_search,
+)
+
 from app.services.web_fact_extractor import (
     extract_web_financial_facts,
     load_validated_web_facts,
@@ -53,31 +62,33 @@ def web_research_tool(
     Execute the complete web-research pipeline.
 
     Phase 3H-B:
-        Serper search discovery.
+        Serper discovery.
 
     Phase 3H-C:
-        Safe source fetching and evidence extraction.
+        Safe page/PDF fetching and evidence extraction.
 
     Phase 3H-D:
-        Persist verified evidence into source_ledger
-        and create request-scoped [Web Source N]
-        citations.
+        Persistent citation-ready web evidence.
 
     Phase 3H-E:
-        Optionally extract structured financial facts,
-        persist them as pending analysis_facts,
-        deterministically validate them, and expose only
-        validated facts.
+        Structured web financial fact extraction +
+        deterministic validation.
 
     Phase 3H-F-B:
-        Apply product-level query, domain, result-count,
-        and per-user hourly search limits before Serper is
-        called.
+        Product request limits + hourly Serper quota.
+
+    Phase 3H-F-C:
+        Process-local search and fetched-evidence caching.
+
+        IMPORTANT:
+        Search cache lookup occurs BEFORE hourly quota
+        consumption. A search cache hit therefore does not
+        consume another Serper allowance.
     """
 
     # =====================================================
     # Phase 3H-F-B
-    # Product-level web request controls
+    # Product-level web request guard
     # =====================================================
 
     guarded_request = (
@@ -85,26 +96,6 @@ def web_research_tool(
             tool_input
         )
     )
-
-    # -----------------------------------------------------
-    # Construct a sanitized WebResearchInput.
-    #
-    # IMPORTANT:
-    #
-    # The original implementation created guarded_request
-    # but still sent the original tool_input to Serper.
-    #
-    # That meant:
-    #
-    #   max_results
-    #   trusted_domains
-    #   cleaned query
-    #
-    # were not actually enforced at the provider boundary.
-    #
-    # From this point onward, provider-facing search uses
-    # guarded_tool_input.
-    # -----------------------------------------------------
 
     guarded_tool_input = (
         tool_input.model_copy(
@@ -123,47 +114,116 @@ def web_research_tool(
         )
     )
 
-    # -----------------------------------------------------
-    # Reserve one hourly web-search allowance.
-    #
-    # In 3H-F-C caching, this will move AFTER cache lookup,
-    # so cache hits do not consume search quota.
-    #
-    # For 3H-F-B, no cache exists yet, so every real
-    # web_research invocation reaching this point consumes
-    # one allowance.
-    # -----------------------------------------------------
-
-    check_web_usage_limit(
-        user_id=user_id,
-    )
-
     # =====================================================
-    # Phase 3H-B
-    # Search discovery
+    # Phase 3H-F-C
+    # Search cache
     # =====================================================
 
-    search_output = (
-        search_web_with_serper(
-            guarded_tool_input
+    search_cache_hit = False
+
+    search_cache_key = (
+        build_web_search_cache_key(
+            user_id=user_id,
+
+            query=(
+                guarded_request.query
+            ),
+
+            trusted_domains=(
+                guarded_request
+                .trusted_domains
+            ),
+
+            max_results=(
+                guarded_request
+                .max_results
+            ),
         )
     )
 
+    search_output = (
+        get_cached_web_search(
+            key=(
+                search_cache_key
+            )
+        )
+    )
+
+    if search_output is not None:
+        search_cache_hit = True
+
+        print(
+            (
+                "[web_research] "
+                "SEARCH CACHE HIT"
+            ),
+            flush=True,
+        )
+
+    else:
+        print(
+            (
+                "[web_research] "
+                "SEARCH CACHE MISS"
+            ),
+            flush=True,
+        )
+
+        # ================================================
+        # Phase 3H-F-B
+        #
+        # IMPORTANT:
+        # Consume quota ONLY on a real provider call.
+        # ================================================
+
+        check_web_usage_limit(
+            user_id=user_id,
+        )
+
+        # ================================================
+        # Phase 3H-B
+        # Real Serper provider call
+        # ================================================
+
+        search_output = (
+            search_web_with_serper(
+                guarded_tool_input
+            )
+        )
+
+        # A successful Serper response is cacheable even
+        # when it contains zero candidates. This prevents
+        # the same no-result query repeatedly consuming API
+        # calls during the short search TTL.
+        set_cached_web_search(
+            key=(
+                search_cache_key
+            ),
+
+            value=(
+                search_output
+            ),
+        )
+
     # -----------------------------------------------------
-    # Nothing discovered.
-    #
-    # There is nothing further to:
-    #
-    #   fetch
-    #   persist
-    #   cite
-    #   structure
+    # No discovery candidates.
     # -----------------------------------------------------
 
     if not (
         search_output.candidates
     ):
-        return search_output
+        return (
+            search_output
+            .model_copy(
+                update={
+                    "search_cache_hit":
+                        search_cache_hit,
+
+                    "fetch_cache_hit":
+                        False,
+                }
+            )
+        )
 
     # =====================================================
     # Phase 3H-C
@@ -171,7 +231,8 @@ def web_research_tool(
     # =====================================================
 
     if not (
-        settings.web_fetch_enabled
+        settings
+        .web_fetch_enabled
     ):
         warnings = list(
             search_output.warnings
@@ -188,26 +249,126 @@ def web_research_tool(
             search_output
             .model_copy(
                 update={
+                    "search_cache_hit":
+                        search_cache_hit,
+
+                    "fetch_cache_hit":
+                        False,
+
                     "warnings":
                         warnings,
                 }
             )
         )
 
-    (
-        fetched_sources,
-        fetch_failures,
-    ) = (
-        fetch_candidate_sources(
+    # =====================================================
+    # Phase 3H-F-C
+    # Fetch/evidence cache
+    # =====================================================
+
+    candidate_urls = [
+        str(
+            candidate.url
+        )
+        for candidate
+        in search_output.candidates
+        if getattr(
+            candidate,
+            "url",
+            None,
+        )
+    ]
+
+    fetch_cache_key = (
+        build_web_fetch_cache_key(
+            user_id=user_id,
+
             query=(
                 guarded_request.query
             ),
 
-            candidates=(
-                search_output.candidates
+            candidate_urls=(
+                candidate_urls
             ),
         )
     )
+
+    cached_fetch_result = (
+        get_cached_web_fetch(
+            key=(
+                fetch_cache_key
+            )
+        )
+    )
+
+    fetch_cache_hit = False
+
+    if (
+        cached_fetch_result
+        is not None
+    ):
+        fetch_cache_hit = True
+
+        print(
+            (
+                "[web_research] "
+                "FETCH CACHE HIT"
+            ),
+            flush=True,
+        )
+
+        (
+            fetched_sources,
+            fetch_failures,
+        ) = (
+            cached_fetch_result
+        )
+
+    else:
+        print(
+            (
+                "[web_research] "
+                "FETCH CACHE MISS"
+            ),
+            flush=True,
+        )
+
+        (
+            fetched_sources,
+            fetch_failures,
+        ) = (
+            fetch_candidate_sources(
+                query=(
+                    guarded_request.query
+                ),
+
+                candidates=(
+                    search_output.candidates
+                ),
+            )
+        )
+
+        # -------------------------------------------------
+        # Cache only when at least one source was fetched.
+        #
+        # Completely failed fetch batches may be temporary
+        # network/server problems and should be retried on
+        # the next request rather than cached for an hour.
+        # -------------------------------------------------
+
+        if fetched_sources:
+            set_cached_web_fetch(
+                key=(
+                    fetch_cache_key
+                ),
+
+                value=(
+                    (
+                        fetched_sources,
+                        fetch_failures,
+                    )
+                ),
+            )
 
     evidence_source_count = sum(
         1
@@ -286,8 +447,7 @@ def web_research_tool(
     )
 
     if (
-        evidence_source_count
-        > 0
+        evidence_source_count > 0
         and not citation_ready
     ):
         warnings.append(
@@ -318,17 +478,6 @@ def web_research_tool(
 
     validated_facts = []
 
-    # -----------------------------------------------------
-    # Structured extraction is allowed only when:
-    #
-    # 1. Evidence is citation-ready.
-    # 2. Planner requested structured financial facts.
-    # 3. Web fact extraction is enabled.
-    #
-    # This guarantees raw Serper snippets and unpersisted
-    # fetched content cannot become usable analysis_facts.
-    # -----------------------------------------------------
-
     if (
         citation_ready
         and (
@@ -345,8 +494,8 @@ def web_research_tool(
         try:
             # =============================================
             # 3H-E-1
-            # Extract candidates only from persisted,
-            # citation-ready evidence.
+            # Structured extraction from citation-ready
+            # persisted evidence only.
             # =============================================
 
             extraction = (
@@ -381,8 +530,7 @@ def web_research_tool(
 
             # =============================================
             # 3H-E-2
-            # Validate only facts that were actually
-            # persisted.
+            # Deterministic validation.
             # =============================================
 
             if extraction.fact_ids:
@@ -420,11 +568,7 @@ def web_research_tool(
 
                 # =========================================
                 # 3H-E-3
-                # Expose only validated persisted facts.
-                #
-                # pending / rejected / conflict facts stay
-                # unavailable to downstream calculations
-                # and answer generation.
+                # Only validated facts become usable.
                 # =========================================
 
                 validated_facts = (
@@ -462,13 +606,9 @@ def web_research_tool(
                 )
 
         except Exception as error:
-            # -------------------------------------------------
-            # Structured fact failure must never destroy
-            # already verified/citation-ready web evidence.
-            #
-            # Narrative evidence remains usable.
-            # -------------------------------------------------
-
+            # Structured fact processing failure must not
+            # destroy successfully retrieved/cited narrative
+            # web evidence.
             warnings.append(
                 (
                     "Structured web fact "
@@ -572,6 +712,16 @@ def web_research_tool(
 
                 "validated_facts":
                     validated_facts,
+
+                # =========================================
+                # Phase 3H-F-C
+                # =========================================
+
+                "search_cache_hit":
+                    search_cache_hit,
+
+                "fetch_cache_hit":
+                    fetch_cache_hit,
 
                 # =========================================
                 # Combined warnings

@@ -1071,6 +1071,24 @@ def sanitize_tool_results_for_public(
                     )
                     or 0
                 ),
+
+            # Phase 3H-F-C
+
+            "search_cache_hit":
+                bool(
+                    output.get(
+                        "search_cache_hit",
+                        False,
+                    )
+                ),
+
+            "fetch_cache_hit":
+                bool(
+                    output.get(
+                        "fetch_cache_hit",
+                        False,
+                    )
+                ),
         }
 
         public_results.append(

@@ -405,6 +405,16 @@ class WebResearchOutput(BaseModel):
     validated_facts: list[WebValidatedFinancialFact] = Field(default_factory=list,)
 
 
+    # -----------------------------------------------------
+    # Phase 3H-F-C
+    # Internal operational cache metadata
+    # -----------------------------------------------------
+
+    search_cache_hit: bool = False
+
+    fetch_cache_hit: bool = False
+
+
 # =========================================================
 # Phase 3H-F-A
 # Product-safe web research response
