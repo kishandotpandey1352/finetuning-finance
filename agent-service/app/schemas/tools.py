@@ -326,5 +326,6 @@ class ToolPlan(BaseModel):
 
     use_financial_fact_extractor: (bool) = False
     financial_fact_extractor_input: (FinancialFactExtractorInput| None) = None
+    use_web_financial_fact_extractor: bool = False
 
     reason: str

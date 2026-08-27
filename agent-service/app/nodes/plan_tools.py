@@ -158,6 +158,12 @@ def plan_tools_node(
         )
     )
 
+    use_web_financial_fact_extractor = (
+        _should_use_financial_fact_extractor(
+            question
+        )
+    )
+
     financial_fact_extractor_input = (
         FinancialFactExtractorInput(
             document_ids=(
@@ -412,6 +418,10 @@ def plan_tools_node(
             ),
             use_financial_fact_extractor=(
                 use_financial_fact_extractor
+            ),
+
+            use_web_financial_fact_extractor=(
+                use_web_financial_fact_extractor
             ),
 
             financial_fact_extractor_input=(

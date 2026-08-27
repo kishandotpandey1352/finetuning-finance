@@ -292,11 +292,10 @@ def detect_web_gap(
 
     if not use_documents:
         return WebGapDecision(
-            needs_web=False,
+            needs_web=True,
             reason=(
-                "Web fallback is only evaluated "
-                "after the uploaded-document "
-                "workflow."
+                "No uploaded-document evidence is "
+                "available for this request."
             ),
         )
 

@@ -951,7 +951,7 @@ def run_tools_node(
 
                     extract_structured_facts=bool(
                         tool_plan
-                        .use_financial_fact_extractor
+                        .use_web_financial_fact_extractor
                     ),
                 )
             )
