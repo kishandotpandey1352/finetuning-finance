@@ -43,6 +43,8 @@ export interface UsageMetadata {
 }
 
 export interface FinanceResponse {
+  web_fallback_available: boolean;
+  web_fallback_used: any;
   id: string;
   prompt: string;
   title: string;

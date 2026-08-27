@@ -13,6 +13,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { clearAuth, getDisplayName, loadAuth } from "@/lib/auth";
 import type { AuthState, FinanceTask } from "@/types";
 import { AppTopMenu } from "@/components/AppTopMenu";
+import { WebFallbackToggle } from "@/components/WebFallbackToggle";
 
 type StoredDocument = {
   id: string;
@@ -187,6 +188,7 @@ export default function DocSearchPage() {
 
   const [providerId, setProviderId] = useState("openai-premium");
   const [task, setTask] = useState<FinanceTask>("qa");
+  const [allowWebFallback, setAllowWebFallback] = useState(false);
   const [question, setQuestion] = useState(
     "What are the main financial risks in the selected document?",
   );
@@ -856,6 +858,14 @@ export default function DocSearchPage() {
                     placeholder="Ask a question over selected indexed documents..."
                   />
                 </label>
+
+                <div className="mt-4">
+                  <WebFallbackToggle
+                    enabled={allowWebFallback}
+                    disabled={querying}
+                    onChange={setAllowWebFallback}
+                  />
+                </div>
 
                 <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
                   <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
