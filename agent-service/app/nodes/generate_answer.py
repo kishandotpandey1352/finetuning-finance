@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from langchain_core.messages import (
@@ -1182,6 +1183,117 @@ def _build_validated_web_fact_context(
     )
 
 
+def _get_validated_web_facts(
+    tool_results: list[Any],
+) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    seen_fact_ids: set[str] = set()
+
+    for result in tool_results:
+        if (
+            _result_tool_name(result) != "web_research"
+            or _result_status(result) != "completed"
+        ):
+            continue
+
+        output = _result_output(result)
+        if not output.get("structured_fact_ready", False):
+            continue
+
+        for fact in output.get("validated_facts") or []:
+            if not isinstance(fact, dict):
+                continue
+
+            try:
+                source_number = int(fact["source_number"])
+            except (KeyError, TypeError, ValueError):
+                continue
+
+            if source_number < 2001:
+                continue
+
+            fact_id = str(fact.get("fact_id") or "").strip()
+            if fact_id and fact_id in seen_fact_ids:
+                continue
+            if fact_id:
+                seen_fact_ids.add(fact_id)
+
+            facts.append(fact)
+
+    return facts
+
+
+def _format_web_fact_value(fact: dict[str, Any]) -> str:
+    value = (
+        fact.get("raw_value")
+        or fact.get("normalized_numeric_value")
+        or fact.get("numeric_value")
+    )
+    if value is None:
+        value = "not reported"
+
+    parts = [
+        str(fact.get("currency") or "").strip(),
+        str(value).strip(),
+        str(fact.get("scale") or "").strip(),
+        str(fact.get("unit_label") or "").strip(),
+    ]
+    return " ".join(part for part in parts if part)
+
+
+def _period_is_partial_year(period_label: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(?:q[1-4]|quarter|ytd|year[- ]to[- ]date|nine[- ]months?|six[- ]months?|three[- ]months?|\d+[- ]months?)\b",
+            period_label,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _question_contains_year(question: str) -> bool:
+    return bool(re.search(r"\b(?:19|20)\d{2}\b", question))
+
+
+def _build_validated_web_fact_answer(
+    question: str,
+    facts: list[dict[str, Any]],
+) -> str:
+    answer_lines: list[str] = []
+
+    for fact in facts:
+        metric_label = str(
+            fact.get("metric_label")
+            or fact.get("metric_key")
+            or "Validated financial metric"
+        ).strip()
+        value = _format_web_fact_value(fact)
+        period_label = str(fact.get("period_label") or "").strip()
+        source_number = int(fact["source_number"])
+
+        if period_label:
+            answer_lines.append(
+                f"{metric_label} was {value} for {period_label} [Web Source {source_number}]."
+            )
+        else:
+            answer_lines.append(
+                f"{metric_label} was {value} [Web Source {source_number}]."
+            )
+
+    partial_periods = [
+        str(fact.get("period_label") or "").strip()
+        for fact in facts
+        if _period_is_partial_year(str(fact.get("period_label") or "").strip())
+    ]
+
+    if partial_periods and _question_contains_year(question):
+        answer_lines.append(
+            "Note: the validated source reports a partial-year period rather than a full-year figure."
+        )
+
+    return "\n\n".join(answer_lines)
+
+
 def _has_validated_web_facts(
     tool_results: list[Any],
 ) -> bool:
@@ -1230,10 +1342,6 @@ def _has_validated_web_facts(
 def generate_answer_node(
     state: FinanceAgentState,
 ) -> FinanceAgentState:
-    model = (
-        _get_chat_model()
-    )
-
     memory_context = (
         state.get(
             "memory_context"
@@ -1337,6 +1445,19 @@ def generate_answer_node(
             raw_tool_results
         )
     )
+
+    validated_web_facts = _get_validated_web_facts(raw_tool_results)
+    if validated_web_facts:
+        deterministic_answer = _build_validated_web_fact_answer(
+            question=state["question"],
+            facts=validated_web_facts,
+        )
+        if deterministic_answer:
+            return {
+                **state,
+                "answer": deterministic_answer,
+                "model": "deterministic-validated-web-fact",
+            }
 
     has_validated_web_facts = (
         _has_validated_web_facts(
@@ -1525,6 +1646,22 @@ For web-derived claims:
 
 
 STRUCTURED WEB FINANCIAL FACT RULES:
+
+CRITICAL VALIDATED WEB FACT RULE:
+
+- A fact listed under VALIDATED STRUCTURED WEB FINANCIAL
+    FACTS has already passed deterministic application
+    validation.
+- Such a fact is valid evidence even when uploaded documents
+    do not contain the requested period.
+- Do NOT refuse a validated web fact merely because the
+    uploaded documents are older or do not contain that period.
+- If the validated web fact answers the requested metric,
+    use it and cite its [Web Source N].
+- Always preserve the exact reported period.
+- If the source reports a quarter, nine-month period, YTD,
+    or another partial-year period, do not describe it as a
+    full-year result.
 
 - Structured web facts available:
   {has_validated_web_facts}
@@ -1722,6 +1859,8 @@ Requirements:
     # =====================================================
     # Model invocation
     # =====================================================
+
+    model = _get_chat_model()
 
     response = model.invoke(
         [

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { MemorySuggestionCard } from "@/components/MemorySuggestionCard";
 import { ResponseCard } from "@/components/ResponseCard";
+import { WebSourcePanel } from "@/components/WebSourcePanel";
 import { WebFallbackToggle } from "@/components/WebFallbackToggle";
 
 import {
@@ -1680,6 +1681,12 @@ export function ChatPanel({
               <ResponseCard
                 response={response}
               />
+
+              {response.web_research ? (
+                <div className="mt-3">
+                  <WebSourcePanel research={response.web_research} />
+                </div>
+              ) : null}
 
             </div>
           ) : (

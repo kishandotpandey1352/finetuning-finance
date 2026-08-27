@@ -33,9 +33,36 @@ export type WebAwareFinanceResponse = FinanceResponse & {
   web_fallback_used?: boolean;
   web_fallback_available?: boolean;
   web_fallback_reason?: string | null;
+  web_research?: PublicWebResearchSummary | null;
 };
 
-type PublicWebResearchSummary = {
+export type WebPublicCitation = {
+  source_number: number;
+  title: string;
+  url: string;
+  domain: string;
+  snippet?: string | null;
+  page_number?: number | null;
+  trust_tier?: string | null;
+  content_type?: string | null;
+  retrieved_at?: string | null;
+};
+
+export type WebPublicFinancialFact = {
+  source_number: number;
+  metric_label: string;
+  canonical_metric_key?: string | null;
+  raw_value?: string | null;
+  numeric_value?: number | string | null;
+  normalized_numeric_value?: number | string | null;
+  currency?: string | null;
+  scale?: string | null;
+  unit_label?: string | null;
+  period_label?: string | null;
+  validation_score?: number | null;
+};
+
+export type PublicWebResearchSummary = {
   used?: boolean;
   available?: boolean;
   reason?: string | null;
@@ -48,8 +75,8 @@ type PublicWebResearchSummary = {
   citation_count?: number;
   validated_fact_count?: number;
 
-  citations?: Array<Record<string, unknown>>;
-  validated_facts?: Array<Record<string, unknown>>;
+  citations?: WebPublicCitation[];
+  validated_facts?: WebPublicFinancialFact[];
   warnings?: string[];
 };
 
@@ -987,6 +1014,10 @@ export async function sendFinancePrompt(
 
     web_fallback_reason:
       webFallback.reason,
+
+    web_research:
+      payload.web_research
+      ?? null,
 
     usage:
       buildUsage({

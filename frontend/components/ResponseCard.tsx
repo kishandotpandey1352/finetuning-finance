@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 
-import type { FinanceResponse } from "@/types";
-
+import { CitedAnswer } from "@/components/CitedAnswer";
 import { UsageBadge } from "@/components/UsageBadge";
+import type { WebAwareFinanceResponse } from "@/lib/api";
 
 interface ResponseCardProps {
-  response: FinanceResponse;
+  response: WebAwareFinanceResponse;
   accent?: string;
   footer?: ReactNode;
 }
@@ -27,7 +27,10 @@ export function ResponseCard({ response, accent = "from-cyan-400/30 to-sky-500/1
         </div>
 
         <div className="rounded-3xl border border-white/8 bg-black/20 p-4 text-sm leading-7 text-slate-100">
-          <p className="whitespace-pre-wrap">{response.output}</p>
+          <CitedAnswer
+            text={response.output}
+            citations={response.web_research?.citations ?? []}
+          />
         </div>
 
         <UsageBadge usage={response.usage} compact />
