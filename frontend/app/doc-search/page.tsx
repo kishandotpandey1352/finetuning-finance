@@ -14,6 +14,10 @@ import { clearAuth, getDisplayName, loadAuth } from "@/lib/auth";
 import type { AuthState, FinanceTask } from "@/types";
 import { AppTopMenu } from "@/components/AppTopMenu";
 import { WebFallbackToggle } from "@/components/WebFallbackToggle";
+import { CitedAnswer } from "@/components/CitedAnswer";
+import { RetrievedSourcesPanel } from "@/components/RetrievedSourcesPanel";
+import { WebSourcePanel } from "@/components/WebSourcePanel";
+import type { PublicWebResearchSummary } from "@/lib/api";
 
 type StoredDocument = {
   id: string;
@@ -69,6 +73,38 @@ type RagQueryResponse = {
     };
   };
   error?: string;
+};
+
+type AgentDocumentSource = {
+  document_id?: string;
+  chunk_id?: string;
+  file_name?: string;
+  chunk_index?: number;
+  page_number?: number | null;
+  score?: number;
+  snippet?: string;
+};
+
+type AgentToolResult = {
+  tool_name?: string;
+  status?: string;
+  output?: {
+    sources?: AgentDocumentSource[];
+  };
+};
+
+type AgentAnalyzeResponse = {
+  ok: boolean;
+  request_id?: string;
+  answer?: string;
+  model?: string;
+  web_fallback_used?: boolean;
+  web_fallback_available?: boolean;
+  web_fallback_reason?: string | null;
+  web_research?: PublicWebResearchSummary | null;
+  tool_results?: AgentToolResult[];
+  error?: string;
+  detail?: string;
 };
 
 type DocumentStorageProfile =
@@ -177,6 +213,42 @@ function profileLabel(profile?: DocumentStorageProfile | null) {
   return "Loading";
 }
 
+function extractAgentDocumentSources(
+  payload: AgentAnalyzeResponse,
+): RetrievedSource[] {
+  const rawSources = payload.tool_results?.find(
+    (result) =>
+      result.tool_name === "document_search" &&
+      result.status === "completed",
+  )?.output?.sources ?? [];
+
+  return rawSources.flatMap((source) => {
+    if (
+      typeof source.document_id !== "string" ||
+      typeof source.chunk_id !== "string" ||
+      typeof source.file_name !== "string" ||
+      typeof source.chunk_index !== "number" ||
+      typeof source.score !== "number" ||
+      typeof source.snippet !== "string"
+    ) {
+      return [];
+    }
+
+    return [{
+      documentId: source.document_id,
+      chunkId: source.chunk_id,
+      fileName: source.file_name,
+      chunkIndex: source.chunk_index,
+      pageNumber:
+        typeof source.page_number === "number"
+          ? source.page_number
+          : undefined,
+      score: source.score,
+      snippet: source.snippet,
+    }];
+  });
+}
+
 export default function DocSearchPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -203,6 +275,8 @@ export default function DocSearchPage() {
 
   const [answer, setAnswer] = useState<RagAnswer | null>(null);
   const [sources, setSources] = useState<RetrievedSource[]>([]);
+  const [webResearch, setWebResearch] =
+    useState<PublicWebResearchSummary | null>(null);
   const [latestRequestId, setLatestRequestId] = useState<string | null>(null);
 
   const [ragConfig, setRagConfig] = useState<RagStorageConfig | null>(null);
@@ -221,6 +295,8 @@ export default function DocSearchPage() {
       ),
     [documents, selectedDocumentIds],
   );
+
+  const webFallbackUsed = Boolean(webResearch?.used);
 
   function clearSelectedFile() {
     setSelectedFile(null);
@@ -548,22 +624,65 @@ export default function DocSearchPage() {
     setStatusMessage("Retrieving relevant chunks and asking the model...");
     setAnswer(null);
     setSources([]);
+    setWebResearch(null);
     setLatestRequestId(null);
 
     try {
-      const response = await fetch("/api/documents/query", {
+      const endpoint = allowWebFallback
+        ? "/api/agents/analyze"
+        : "/api/documents/query";
+      const requestBody = allowWebFallback
+        ? {
+            question: trimmedQuestion,
+            provider_id: providerId,
+            use_documents: true,
+            document_ids: selectedDocumentIds,
+            top_k: topK,
+            allow_web_fallback: true,
+            trusted_web_domains: [],
+          }
+        : {
+            question: trimmedQuestion,
+            task,
+            providerId,
+            documentIds: selectedDocumentIds,
+            topK,
+          };
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          question: trimmedQuestion,
-          task,
-          providerId,
-          documentIds: selectedDocumentIds,
-          topK,
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      if (allowWebFallback) {
+        const payload =
+          (await response.json()) as AgentAnalyzeResponse;
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(
+            payload.error ?? payload.detail ?? "Agent analysis failed.",
+          );
+        }
+
+        setAnswer({
+          output: payload.answer ?? "",
+          provider: "openai",
+          model_id: payload.model ?? "",
+          request_id: payload.request_id,
+        });
+        setSources(extractAgentDocumentSources(payload));
+        setWebResearch(payload.web_research ?? null);
+        setLatestRequestId(payload.request_id ?? null);
+        setStatusMessage(
+          payload.web_fallback_used
+            ? "Local document evidence was insufficient. Public web evidence was used."
+            : "The answer was produced from the available local evidence.",
+        );
+        return;
+      }
 
       const payload = (await response.json()) as RagQueryResponse;
 
@@ -573,6 +692,7 @@ export default function DocSearchPage() {
 
       setAnswer(payload.answer ?? null);
       setSources(payload.sources ?? []);
+      setWebResearch(null);
       setLatestRequestId(payload.request_id ?? null);
 
       const bestScore = payload.retrieval?.bestScore;
@@ -668,7 +788,7 @@ export default function DocSearchPage() {
             </div>
           ) : null}
 
-          {statusMessage ? (
+          {statusMessage && !webFallbackUsed ? (
             <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm text-cyan-100">
               {statusMessage}
             </div>
@@ -899,95 +1019,74 @@ export default function DocSearchPage() {
                 </button>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-2">
-                <div className="rounded-3xl border border-white/10 bg-slate-950/75 p-4 shadow-xl shadow-black/15">
-                  <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/70">
-                    Answer
-                  </p>
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-slate-950/75 p-4 shadow-lg shadow-black/10">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/70">
+                      Answer
+                    </p>
+                    {webFallbackUsed ? (
+                      <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">
+                        Web-assisted
+                      </span>
+                    ) : null}
+                  </div>
 
                   {answer?.output ? (
-                    <div className="mt-3 space-y-3">
-                      <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                        <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
-                          {latestRequestId ? (
-                            <span className="max-w-full truncate rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
-                              {latestRequestId}
-                            </span>
-                          ) : null}
-                          {answer.provider ? (
-                            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
-                              {answer.provider}
-                            </span>
-                          ) : null}
-                          {answer.model_id ? (
-                            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
-                              {answer.model_id}
-                            </span>
-                          ) : null}
-                        </div>
-
-                        <p className="whitespace-pre-wrap text-sm leading-6 text-slate-100">
-                          {answer.output}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-slate-400">
-                      Ask a question to generate a grounded answer from
-                      retrieved document chunks.
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-3xl border border-white/10 bg-slate-950/75 p-4 shadow-xl shadow-black/15">
-                  <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">
-                    Retrieved Sources
-                  </p>
-                  <h2 className="mt-2 text-lg font-semibold text-white">
-                    Evidence used
-                  </h2>
-
-                  {sources.length ? (
-                    <div className="mt-3 space-y-2">
-                      {sources.map((source, index) => (
-                        <details
-                          key={source.chunkId}
-                          className="rounded-2xl border border-white/10 bg-black/25 p-3"
-                          open={index === 0}
-                        >
-                          <summary className="cursor-pointer list-none">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-white">
-                                  Source {index + 1}: {source.fileName}
-                                </p>
-                                <p className="mt-1 text-xs text-slate-400">
-                                  Chunk {source.chunkIndex}
-                                  {source.pageNumber
-                                    ? ` · page ${source.pageNumber}`
-                                    : ""}{" "}
-                                  · score {source.score.toFixed(3)}
-                                </p>
-                              </div>
-
-                              <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[11px] font-semibold text-amber-100">
-                                Retrieved
-                              </span>
-                            </div>
-                          </summary>
-
-                          <p className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm leading-6 text-slate-300">
-                            {source.snippet}
+                    <div className="mt-3">
+                      {webFallbackUsed ? (
+                        <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-3">
+                          <p className="text-sm font-semibold text-white">
+                            Uploaded document evidence was insufficient
                           </p>
+                          <p className="mt-1 text-xs leading-5 text-slate-400">
+                            The uploaded document did not contain enough evidence
+                            for the requested period or metric. Web fallback found
+                            the following relevant external evidence.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {webFallbackUsed ? (
+                        <details className="group mt-3 rounded-xl border border-white/10 bg-black/20">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5">
+                            <span className="text-xs font-semibold text-slate-300">
+                              Show full generated answer
+                            </span>
+                            <span className="text-sm text-slate-500 transition-transform group-open:rotate-180">
+                              ▾
+                            </span>
+                          </summary>
+                          <div className="border-t border-white/10 p-3">
+                            <CitedAnswer
+                              text={answer.output ?? ""}
+                              citations={webResearch?.citations ?? []}
+                            />
+                          </div>
                         </details>
-                      ))}
+                      ) : (
+                        <CitedAnswer text={answer.output ?? ""} citations={[]} />
+                      )}
                     </div>
                   ) : (
-                    <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-slate-400">
-                      Retrieved chunks will appear here after a document query.
-                    </div>
+                    <p className="mt-3 text-sm text-slate-400">
+                      Ask a question to generate a grounded answer.
+                    </p>
                   )}
                 </div>
+
+                {webFallbackUsed && webResearch ? (
+                  <WebSourcePanel research={webResearch} />
+                ) : null}
+
+                <RetrievedSourcesPanel
+                  sources={sources}
+                  defaultOpen={!webFallbackUsed}
+                />
+
+                {!webFallbackUsed && webResearch ? (
+                  <WebSourcePanel research={webResearch} />
+                ) : null}
               </div>
             </section>
           </div>
