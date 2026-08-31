@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { MemorySuggestionCard } from "@/components/MemorySuggestionCard";
 import { ResponseCard } from "@/components/ResponseCard";
-import { WebSourcePanel } from "@/components/WebSourcePanel";
+import { WebSourcePanel } from "./WebSourcePanel";
 import { WebFallbackToggle } from "@/components/WebFallbackToggle";
 
 import {

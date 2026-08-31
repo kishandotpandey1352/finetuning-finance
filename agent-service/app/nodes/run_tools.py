@@ -1017,6 +1017,16 @@ def run_tools_node(
                 )
             )
 
+            # =================================================
+            # Phase 3H-F-F
+            #
+            # The internal tool record retains diagnostic
+            # information for server-side troubleshooting.
+            #
+            # Browser/public responses must receive only the
+            # safe generic status below.
+            # =================================================
+
             # Search failed, so we have not actually
             # obtained usable web fallback results.
             web_fallback_used = False
@@ -1024,6 +1034,12 @@ def run_tools_node(
             # Fallback is still conceptually available,
             # although this particular attempt failed.
             web_fallback_available = True
+
+            web_fallback_reason = (
+                "Public web research was attempted "
+                "but could not be completed. "
+                "Local evidence remains insufficient."
+            )
 
     # ---------------------------------------------------------
     # Return updated graph state

@@ -17,6 +17,9 @@ from app.schemas.agent import (
     AgentAnalyzeResponse,
 )
 
+from app.services.web_citation_guard import (
+    enforce_web_citation_integrity,
+)
 from app.services.web_product_response import (
     build_web_product_summary,
     sanitize_tool_results_for_public,
@@ -247,6 +250,55 @@ def analyze(
             )
         )
 
+        # =================================================
+        # Phase 3H-F-F
+        # Deterministic Web Source citation integrity
+        # =================================================
+
+        citation_guard = (
+            enforce_web_citation_integrity(
+                answer=str(
+                    result.get(
+                        "answer",
+                        "",
+                    )
+                    or ""
+                ),
+                web_research=(
+                    web_research
+                ),
+            )
+        )
+
+        if (
+            citation_guard
+            .invalid_citations
+        ):
+            warnings = list(
+                web_research.warnings
+                or []
+            )
+
+            warning = (
+                "One or more invalid web citation "
+                "references were removed from the "
+                "generated answer."
+            )
+
+            if warning not in warnings:
+                warnings.append(
+                    warning
+                )
+
+            web_research = (
+                web_research.model_copy(
+                    update={
+                        "warnings":
+                            warnings,
+                    }
+                )
+            )
+
         # IMPORTANT:
         #
         # Raw web_research tool output must never be sent
@@ -270,10 +322,7 @@ def analyze(
                 ),
 
                 answer=(
-                    result.get(
-                        "answer",
-                        "",
-                    )
+                    citation_guard.answer
                 ),
 
                 memory_context=(
