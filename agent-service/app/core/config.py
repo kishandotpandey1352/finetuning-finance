@@ -1,4 +1,4 @@
-try:
+﻿try:
     from pydantic_settings import (
         BaseSettings,
         SettingsConfigDict,
@@ -164,5 +164,36 @@ class Settings(
 
     # Maximum entries in each process-local cache.
     web_cache_max_entries: int = 500
+
+    # =========================================================
+    # Phase 3I-A
+    # Multi-agent contracts / registry guardrails
+    # =========================================================
+
+    # Runtime remains disabled until coordinator/DAG/security gates pass.
+    multi_agent_enabled: bool = False
+
+    # Initial operational limits. Later 3I-C/3I-D code must read these
+    # values rather than introducing duplicate hardcoded limits.
+    multi_agent_max_agents_per_request: int = 6
+    multi_agent_max_coordinator_rounds: int = 2
+    multi_agent_max_retries_per_agent: int = 1
+    multi_agent_max_graph_depth: int = 4
+    multi_agent_max_web_searches: int = 2
+    multi_agent_max_web_fetches: int = 8
+    multi_agent_request_timeout_seconds: float = 90.0
+    multi_agent_max_concurrency: int = 3
+
+    # Initial development budgets. Tune from provider pricing and telemetry
+    # before production rollout; these are guardrails, not billing promises.
+    multi_agent_max_llm_tokens: int = 24_000
+    multi_agent_max_estimated_cost_usd: float = 0.50
+
+    # Per-agent policy defaults used by the 3I registry.
+    multi_agent_default_agent_timeout_seconds: float = 30.0
+    multi_agent_web_agent_timeout_seconds: float = 45.0
+    multi_agent_default_agent_cost_limit_usd: float = 0.02
+    multi_agent_llm_agent_cost_limit_usd: float = 0.15
+    multi_agent_web_agent_cost_limit_usd: float = 0.20
 
 settings = Settings()
