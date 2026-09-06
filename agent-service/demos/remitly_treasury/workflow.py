@@ -1,149 +1,497 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
-from pathlib import Path
-from uuid import uuid4
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from time import perf_counter
 
-from .agents import (
+from demos.remitly_treasury.agent_models import (
+    CashPositionResult,
+    FundingRecommendationResult,
+    ObligationsResult,
+    VarianceResult,
+)
+from demos.remitly_treasury.agents import (
     CashPositionAgent,
     FundingRecommendationAgent,
     ObligationsAgent,
-    VarianceAgent,
+    VarianceReconciliationAgent,
 )
-from .models import RunState, TreasuryRunResult
-from .tools import MockBalanceTool, MockSettlementTool, StaleSourceData, load_policy
-from .tracing import ExecutionTrace
+from demos.remitly_treasury.approval import (
+    ApprovalDecision,
+    ApprovalGateResult,
+    TreasuryApprovalGate,
+)
+from demos.remitly_treasury.domain import (
+    BalanceSnapshot,
+    FundingPolicy,
+    SettlementSnapshot,
+)
+from demos.remitly_treasury.failure import (
+    SettlementServiceUnavailableError,
+    SimulatedSettlementService,
+    TreasuryFailure,
+    TreasuryFailureCode,
+    TreasuryRunState,
+)
+from demos.remitly_treasury.security import (
+    TreasuryAuthorizationError,
+    TreasuryCapability,
+    TreasuryCapabilityGuard,
+    TreasuryDataScope,
+)
+from demos.remitly_treasury.tools import StaleSourceDataError
 
 
-class TreasuryWorkflow:
-    """Interview-safe Treasury workflow.
+class TreasuryTaskState(str, Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    skipped = "skipped"
+    retrying = "retrying"
 
-    The two root tasks are independent and execute in parallel. Variance waits
-    for both roots; recommendation waits for variance; deterministic policy
-    decides whether the workflow stops for human approval.
-    """
 
+@dataclass(frozen=True)
+class TreasuryTaskSpec:
+    task_id: str
+    dependencies: tuple[str, ...]
+
+
+TREASURY_DAG = (
+    TreasuryTaskSpec("cash_position", ()),
+    TreasuryTaskSpec("obligations", ()),
+    TreasuryTaskSpec("variance", ("cash_position", "obligations")),
+    TreasuryTaskSpec("funding_recommendation", ("variance",)),
+    TreasuryTaskSpec("approval_gate", ("funding_recommendation",)),
+)
+
+
+@dataclass
+class TreasuryWorkflowResult:
+    cash_position: CashPositionResult | None
+    obligations: ObligationsResult | None
+    variance: VarianceResult | None
+    funding_recommendation: FundingRecommendationResult | None
+    approval: ApprovalGateResult | None
+    workflow_state: ApprovalDecision | None
+    run_state: TreasuryRunState
+    failure: TreasuryFailure | None
+    task_states: dict[str, TreasuryTaskState]
+    retry_counts: dict[str, int]
+    started_order: list[str]
+    completed_order: list[str]
+    latency_ms: int
+
+
+def _run_state_from_approval(decision: ApprovalDecision) -> TreasuryRunState:
+    return {
+        ApprovalDecision.no_action: TreasuryRunState.no_action,
+        ApprovalDecision.auto_allowed: TreasuryRunState.auto_allowed,
+        ApprovalDecision.waiting_for_approval: TreasuryRunState.waiting_for_approval,
+        ApprovalDecision.blocked: TreasuryRunState.blocked,
+    }[decision]
+
+
+class TreasuryDAGWorkflow:
     def __init__(
         self,
         *,
-        balances_path: Path,
-        obligations_path: Path,
-        policy_path: Path,
-        now_provider=None,
-        settlement_fail_attempts: int = 0,
-        settlement_max_retries: int = 2,
-    ) -> None:
-        self.now_provider = now_provider or (lambda: datetime.now(timezone.utc))
-        self.policy = load_policy(policy_path)
-        self.balance_tool = MockBalanceTool(balances_path, self.now_provider)
-        self.settlement_tool = MockSettlementTool(
-            obligations_path, fail_attempts=settlement_fail_attempts
-        )
-        self.cash_agent = CashPositionAgent(self.balance_tool, self.policy)
-        self.obligations_agent = ObligationsAgent(
-            self.settlement_tool, max_retries=settlement_max_retries
-        )
-        self.variance_agent = VarianceAgent()
-        self.funding_agent = FundingRecommendationAgent()
+        cash_agent=None,
+        obligations_agent=None,
+        variance_agent=None,
+        funding_agent=None,
+        approval_gate=None,
+        capability_guard: TreasuryCapabilityGuard | None = None,
+        settlement_service: SimulatedSettlementService | None = None,
+        settlement_retry_limit: int = 2,
+    ):
+        if settlement_retry_limit < 0:
+            raise ValueError("settlement_retry_limit must be >= 0")
 
-    async def run(self, run_id: str | None = None) -> TreasuryRunResult:
-        run_id = run_id or f"treasury-demo-{uuid4().hex[:8]}"
-        trace = ExecutionTrace()
-        trace.add("Coordinator", "RECEIVED", "Treasury liquidity-monitoring objective received")
-        trace.add(
-            "Coordinator",
-            "PLAN_CREATED",
-            "cash_position + obligations -> variance -> funding_recommendation",
-        )
-        trace.add("PlanValidator", "PASSED", "Dependency graph and demo policy accepted")
+        self.cash_agent = cash_agent or CashPositionAgent()
+        self.obligations_agent = obligations_agent or ObligationsAgent()
+        self.variance_agent = variance_agent or VarianceReconciliationAgent()
+        self.funding_agent = funding_agent or FundingRecommendationAgent()
+        self.approval_gate = approval_gate or TreasuryApprovalGate()
+        self.capability_guard = capability_guard or TreasuryCapabilityGuard()
+        self.settlement_service = settlement_service or SimulatedSettlementService()
+        self.settlement_retry_limit = settlement_retry_limit
 
-        trace.add("cash_position_agent", "STARTED", "Reading current balances")
-        trace.add("obligations_agent", "STARTED", "Reading pending settlements")
+        # Fail closed if execution privilege is ever accidentally added.
+        self.capability_guard.assert_no_execution_capability()
 
+    async def run(
+        self,
+        *,
+        balances: BalanceSnapshot,
+        settlements: SettlementSnapshot,
+        policy: FundingPolicy,
+        reference_time: datetime,
+        max_balance_age_seconds: int,
+        settlements_through: datetime | None = None,
+    ) -> TreasuryWorkflowResult:
+        states = {task.task_id: TreasuryTaskState.pending for task in TREASURY_DAG}
+        retries = {task.task_id: 0 for task in TREASURY_DAG}
+        started: list[str] = []
+        completed: list[str] = []
+        clock = perf_counter()
+
+        cash_result = None
+        obligations_result = None
+        variance_result = None
+        funding_result = None
+        approval_result = None
+
+        def result(
+            *,
+            run_state: TreasuryRunState,
+            failure: TreasuryFailure | None = None,
+            workflow_state: ApprovalDecision | None = None,
+        ) -> TreasuryWorkflowResult:
+            return TreasuryWorkflowResult(
+                cash_position=cash_result,
+                obligations=obligations_result,
+                variance=variance_result,
+                funding_recommendation=funding_result,
+                approval=approval_result,
+                workflow_state=workflow_state,
+                run_state=run_state,
+                failure=failure,
+                task_states=states,
+                retry_counts=retries,
+                started_order=started,
+                completed_order=completed,
+                latency_ms=max(0, int((perf_counter() - clock) * 1000)),
+            )
+
+        def skip_downstream(after_task: str) -> None:
+            order = [
+                "cash_position",
+                "obligations",
+                "variance",
+                "funding_recommendation",
+                "approval_gate",
+            ]
+            if after_task in {"cash_position", "obligations"}:
+                targets = ["variance", "funding_recommendation", "approval_gate"]
+            elif after_task == "variance":
+                targets = ["funding_recommendation", "approval_gate"]
+            elif after_task == "funding_recommendation":
+                targets = ["approval_gate"]
+            else:
+                targets = []
+            for task_id in targets:
+                if states[task_id] == TreasuryTaskState.pending:
+                    states[task_id] = TreasuryTaskState.skipped
+
+        async def run_cash():
+            states["cash_position"] = TreasuryTaskState.running
+            started.append("cash_position")
+            try:
+                self.capability_guard.authorize(
+                    agent_name=self.cash_agent.name,
+                    capability=TreasuryCapability.ANALYZE_CASH_POSITION,
+                    data_scopes={TreasuryDataScope.BALANCE_SNAPSHOT},
+                )
+                value = await asyncio.to_thread(
+                    self.cash_agent.execute,
+                    balances=balances,
+                    reference_time=reference_time,
+                    max_age_seconds=max_balance_age_seconds,
+                )
+                states["cash_position"] = TreasuryTaskState.completed
+                completed.append("cash_position")
+                return "ok", value, None
+            except TreasuryAuthorizationError as exc:
+                states["cash_position"] = TreasuryTaskState.failed
+                completed.append("cash_position")
+                return (
+                    "unauthorized",
+                    None,
+                    TreasuryFailure(
+                        code=TreasuryFailureCode.unauthorized_execution,
+                        message=str(exc),
+                        failed_task="cash_position",
+                    ),
+                )
+            except StaleSourceDataError as exc:
+                states["cash_position"] = TreasuryTaskState.failed
+                completed.append("cash_position")
+                return (
+                    "stale",
+                    None,
+                    TreasuryFailure(
+                        code=TreasuryFailureCode.stale_source_data,
+                        message=str(exc),
+                        failed_task="cash_position",
+                        evidence_ids=[r.evidence_id for r in balances.records],
+                    ),
+                )
+            except Exception as exc:
+                states["cash_position"] = TreasuryTaskState.failed
+                completed.append("cash_position")
+                return (
+                    "failed",
+                    None,
+                    TreasuryFailure(
+                        code=TreasuryFailureCode.failed_dependency,
+                        message=f"Cash-position dependency failed: {exc}",
+                        failed_task="cash_position",
+                    ),
+                )
+
+        async def run_obligations():
+            states["obligations"] = TreasuryTaskState.running
+            started.append("obligations")
+            attempts = 0
+            max_attempts = self.settlement_retry_limit + 1
+
+            try:
+                self.capability_guard.authorize(
+                    agent_name=self.obligations_agent.name,
+                    capability=TreasuryCapability.ANALYZE_OBLIGATIONS,
+                    data_scopes={TreasuryDataScope.SETTLEMENT_SNAPSHOT},
+                )
+            except TreasuryAuthorizationError as exc:
+                states["obligations"] = TreasuryTaskState.failed
+                completed.append("obligations")
+                return (
+                    "unauthorized",
+                    None,
+                    TreasuryFailure(
+                        code=TreasuryFailureCode.unauthorized_execution,
+                        message=str(exc),
+                        failed_task="obligations",
+                    ),
+                )
+
+            while attempts < max_attempts:
+                attempts += 1
+                try:
+                    self.settlement_service.before_read()
+                    value = await asyncio.to_thread(
+                        self.obligations_agent.execute,
+                        settlements=settlements,
+                        through=settlements_through,
+                    )
+                    retries["obligations"] = attempts - 1
+                    states["obligations"] = TreasuryTaskState.completed
+                    completed.append("obligations")
+                    return "ok", value, None
+                except SettlementServiceUnavailableError as exc:
+                    retries["obligations"] = attempts - 1
+                    if attempts >= max_attempts:
+                        states["obligations"] = TreasuryTaskState.failed
+                        completed.append("obligations")
+                        return (
+                            "failed",
+                            None,
+                            TreasuryFailure(
+                                code=TreasuryFailureCode.settlement_service_unavailable,
+                                message=str(exc),
+                                retry_count=attempts - 1,
+                                failed_task="obligations",
+                            ),
+                        )
+                    states["obligations"] = TreasuryTaskState.retrying
+                    await asyncio.sleep(0)
+                    states["obligations"] = TreasuryTaskState.running
+                except Exception as exc:
+                    states["obligations"] = TreasuryTaskState.failed
+                    completed.append("obligations")
+                    return (
+                        "failed",
+                        None,
+                        TreasuryFailure(
+                            code=TreasuryFailureCode.failed_dependency,
+                            message=f"Obligations dependency failed: {exc}",
+                            retry_count=attempts - 1,
+                            failed_task="obligations",
+                        ),
+                    )
+
+        cash_task = asyncio.create_task(run_cash())
+        obligations_task = asyncio.create_task(run_obligations())
+
+        cash_status, cash_value, cash_failure = await cash_task
+        obligations_status, obligations_value, obligations_failure = await obligations_task
+
+        cash_result = cash_value
+        obligations_result = obligations_value
+
+        if cash_status != "ok" or obligations_status != "ok":
+            skip_downstream("cash_position")
+
+            auth_failure = (
+                cash_failure if cash_status == "unauthorized"
+                else obligations_failure if obligations_status == "unauthorized"
+                else None
+            )
+            if auth_failure is not None:
+                return result(
+                    run_state=TreasuryRunState.unauthorized_execution,
+                    failure=auth_failure,
+                )
+
+            if cash_status == "stale":
+                return result(
+                    run_state=TreasuryRunState.stale_source_data,
+                    failure=cash_failure,
+                )
+
+            upstream_failure = cash_failure or obligations_failure
+            return result(
+                run_state=TreasuryRunState.failed_dependency,
+                failure=TreasuryFailure(
+                    code=TreasuryFailureCode.failed_dependency,
+                    message=(
+                        "Required upstream Treasury dependency failed; "
+                        "downstream calculations and recommendations were skipped."
+                    ),
+                    retry_count=(
+                        upstream_failure.retry_count if upstream_failure else 0
+                    ),
+                    failed_task=(
+                        upstream_failure.failed_task if upstream_failure else None
+                    ),
+                    evidence_ids=(
+                        upstream_failure.evidence_ids if upstream_failure else []
+                    ),
+                ),
+            )
+
+        states["variance"] = TreasuryTaskState.running
+        started.append("variance")
         try:
-            cash_task = asyncio.create_task(self.cash_agent.execute())
-            obligations_task = asyncio.create_task(self.obligations_agent.execute())
-            cash, obligations = await asyncio.gather(cash_task, obligations_task)
-        except StaleSourceData as exc:
-            trace.add("cash_position_agent", "BLOCKED", str(exc))
-            return TreasuryRunResult(
-                run_id=run_id,
-                state=RunState.BLOCKED,
-                trace=trace.events,
-                error=str(exc),
-                metadata={"required_action": "REFRESH_BALANCE"},
+            self.capability_guard.authorize(
+                agent_name=self.variance_agent.name,
+                capability=TreasuryCapability.RECONCILE_VARIANCE,
+                data_scopes={
+                    TreasuryDataScope.CASH_POSITION_RESULT,
+                    TreasuryDataScope.OBLIGATIONS_RESULT,
+                },
+            )
+            variance_result = await asyncio.to_thread(
+                self.variance_agent.execute,
+                cash=cash_result,
+                obligations=obligations_result,
+            )
+            states["variance"] = TreasuryTaskState.completed
+            completed.append("variance")
+        except TreasuryAuthorizationError as exc:
+            states["variance"] = TreasuryTaskState.failed
+            skip_downstream("variance")
+            completed.append("variance")
+            return result(
+                run_state=TreasuryRunState.unauthorized_execution,
+                failure=TreasuryFailure(
+                    code=TreasuryFailureCode.unauthorized_execution,
+                    message=str(exc),
+                    failed_task="variance",
+                ),
+            )
+        except Exception as exc:
+            states["variance"] = TreasuryTaskState.failed
+            skip_downstream("variance")
+            completed.append("variance")
+            return result(
+                run_state=TreasuryRunState.failed_dependency,
+                failure=TreasuryFailure(
+                    code=TreasuryFailureCode.failed_dependency,
+                    message=f"Variance dependency failed: {exc}",
+                    failed_task="variance",
+                ),
             )
 
-        trace.add("cash_position_agent", "COMPLETED", "Cash positions calculated deterministically")
-        if obligations.status != "success":
-            trace.add(
-                "obligations_agent",
-                "FAILED",
-                f"{obligations.error}; retries={obligations.retry_count}",
+        states["funding_recommendation"] = TreasuryTaskState.running
+        started.append("funding_recommendation")
+        try:
+            self.capability_guard.authorize(
+                agent_name=self.funding_agent.name,
+                capability=TreasuryCapability.RECOMMEND_FUNDING,
+                data_scopes={
+                    TreasuryDataScope.CASH_POSITION_RESULT,
+                    TreasuryDataScope.VARIANCE_RESULT,
+                    TreasuryDataScope.FUNDING_POLICY,
+                },
             )
-            return TreasuryRunResult(
-                run_id=run_id,
-                state=RunState.FAILED,
-                cash_position=cash,
-                obligations=obligations,
-                trace=trace.events,
-                error="FAILED_DEPENDENCY",
+            funding_result = await asyncio.to_thread(
+                self.funding_agent.execute,
+                cash=cash_result,
+                variance=variance_result,
+                policy=policy,
             )
-        trace.add(
-            "obligations_agent",
-            "COMPLETED",
-            f"Pending settlements grouped by currency; retries={obligations.retry_count}",
-        )
-
-        trace.add("variance_agent", "STARTED", "Waiting prerequisites satisfied")
-        variance = await self.variance_agent.execute(cash, obligations)
-        if variance.status != "success":
-            trace.add("variance_agent", "FAILED", variance.error or "FAILED_DEPENDENCY")
-            return TreasuryRunResult(
-                run_id=run_id,
-                state=RunState.FAILED,
-                cash_position=cash,
-                obligations=obligations,
-                variance=variance,
-                trace=trace.events,
-                error=variance.error,
+            states["funding_recommendation"] = TreasuryTaskState.completed
+            completed.append("funding_recommendation")
+        except TreasuryAuthorizationError as exc:
+            states["funding_recommendation"] = TreasuryTaskState.failed
+            skip_downstream("funding_recommendation")
+            completed.append("funding_recommendation")
+            return result(
+                run_state=TreasuryRunState.unauthorized_execution,
+                failure=TreasuryFailure(
+                    code=TreasuryFailureCode.unauthorized_execution,
+                    message=str(exc),
+                    failed_task="funding_recommendation",
+                ),
             )
-        shortfalls = {
-            c: v["projected_shortfall"]
-            for c, v in variance.by_currency.items()
-            if float(v["projected_shortfall"]) > 0
-        }
-        trace.add("variance_agent", "COMPLETED", f"Shortfalls={shortfalls or 'none'}")
-
-        trace.add("funding_recommendation_agent", "STARTED", "Creating bounded recommendation")
-        recommendation = await self.funding_agent.execute(variance, self.policy)
-        trace.add(
-            "funding_recommendation_agent",
-            "COMPLETED",
-            f"{recommendation.recommendation}; amount={recommendation.proposed_amount:.2f}",
-        )
-
-        if recommendation.requires_human_approval:
-            trace.add(
-                "PolicyGate",
-                "HUMAN_APPROVAL_REQUIRED",
-                "Recommendation exceeds manual-approval threshold",
+        except Exception as exc:
+            states["funding_recommendation"] = TreasuryTaskState.failed
+            skip_downstream("funding_recommendation")
+            completed.append("funding_recommendation")
+            return result(
+                run_state=TreasuryRunState.failed_dependency,
+                failure=TreasuryFailure(
+                    code=TreasuryFailureCode.failed_dependency,
+                    message=f"Funding recommendation failed: {exc}",
+                    failed_task="funding_recommendation",
+                ),
             )
-            state = RunState.WAITING_FOR_APPROVAL
-        elif recommendation.status == "blocked":
-            trace.add("PolicyGate", "BLOCKED", recommendation.reason)
-            state = RunState.BLOCKED
-        else:
-            trace.add("PolicyGate", "PASSED", "No human approval required")
-            state = RunState.COMPLETED
 
-        return TreasuryRunResult(
-            run_id=run_id,
-            state=state,
-            cash_position=cash,
-            obligations=obligations,
-            variance=variance,
-            recommendation=recommendation,
-            trace=trace.events,
+        states["approval_gate"] = TreasuryTaskState.running
+        started.append("approval_gate")
+        try:
+            self.capability_guard.authorize(
+                agent_name=self.approval_gate.name,
+                capability=TreasuryCapability.EVALUATE_APPROVAL,
+                data_scopes={
+                    TreasuryDataScope.FUNDING_RECOMMENDATION_RESULT,
+                    TreasuryDataScope.FUNDING_POLICY,
+                },
+            )
+            approval_result = await asyncio.to_thread(
+                self.approval_gate.evaluate,
+                recommendation_result=funding_result,
+                policy=policy,
+            )
+            states["approval_gate"] = TreasuryTaskState.completed
+            completed.append("approval_gate")
+        except TreasuryAuthorizationError as exc:
+            states["approval_gate"] = TreasuryTaskState.failed
+            completed.append("approval_gate")
+            return result(
+                run_state=TreasuryRunState.unauthorized_execution,
+                failure=TreasuryFailure(
+                    code=TreasuryFailureCode.unauthorized_execution,
+                    message=str(exc),
+                    failed_task="approval_gate",
+                ),
+            )
+        except Exception as exc:
+            states["approval_gate"] = TreasuryTaskState.failed
+            completed.append("approval_gate")
+            return result(
+                run_state=TreasuryRunState.failed_dependency,
+                failure=TreasuryFailure(
+                    code=TreasuryFailureCode.failed_dependency,
+                    message=f"Approval gate failed: {exc}",
+                    failed_task="approval_gate",
+                ),
+            )
+
+        return result(
+            run_state=_run_state_from_approval(approval_result.workflow_state),
+            workflow_state=approval_result.workflow_state,
         )
